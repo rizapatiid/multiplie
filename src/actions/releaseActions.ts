@@ -69,7 +69,7 @@ function mapRowToReleaseEntry(row: any[], rowIndex: number): ReleaseEntry | null
       return null;
     }
      if (!idRilis) {
-      // console.warn(`[mapRowToReleaseEntry] Row at spreadsheet index ${rowIndex + 2} is missing ID Rilis (Col A). This row will be read-only for updates/deletes by ID. Row data:`, row);
+      console.warn(`[mapRowToReleaseEntry] Row at spreadsheet index ${rowIndex + 2} is missing ID Rilis (Col A). This row will be read-only for updates/deletes by ID. Row data:`, row);
       // For now, let's allow entries without ID Rilis to be displayed, but they won't be updatable/deletable by ID.
       // We assign a placeholder, but it won't match if we try to find by this placeholder later.
     }
@@ -168,33 +168,31 @@ export async function getReleases(): Promise<ReleaseEntry[]> {
     console.error('🔴 [getReleases] CRITICAL ERROR fetching releases from Google Sheets:');
     console.error('Error Type:', error.constructor.name);
     console.error('Error Message:', error.message);
+    
+    let specificMessage = error.message || "Unknown error fetching releases. Check server logs for details.";
+
     if (error.response && error.response.data && error.response.data.error) {
       console.error('Google API Error Details:', JSON.stringify(error.response.data.error, null, 2));
       const apiError = error.response.data.error;
-      let specificMessage = `Google API Error: ${apiError.message} (Code: ${apiError.code})`;
+      specificMessage = `Google API Error: ${apiError.message} (Code: ${apiError.code})`;
       if (apiError.code === 403) {
         specificMessage = "🚫 Permission Denied (403). Check if Google Sheets API is enabled, OAuth consent screen has correct scopes (spreadsheets.readonly or spreadsheets), and the authenticated user (via OAuth) has read access to the spreadsheet.";
-        console.error(specificMessage);
       } else if (apiError.code === 401) {
         specificMessage = "🔑 Authentication Issue (401). OAuth token might be missing, invalid, or expired. Ensure `getAuthenticatedClient` in `src/lib/google-clients.ts` is correctly implemented and provides valid tokens (e.g., via next-auth).";
-        console.error(specificMessage);
-      }  else if (apiError.code === 404) {
+      } else if (apiError.code === 404) {
         specificMessage = `❓ Spreadsheet Not Found (404). Ensure SPREADSHEET_ID "${SPREADSHEET_ID}" is correct and the sheet named "${SHEET_NAME}" exists.`;
-        console.error(specificMessage);
       }
-      return Promise.reject(new Error(specificMessage));
+      console.error(specificMessage);
     } else {
-      // If the error.message is "No access, refresh token, API key or refresh handler callback is set.",
-      // it means the Google API client was not properly authenticated in `src/lib/google-clients.ts`.
-      // This is the MOST LIKELY cause if you see this specific message.
       if (error.message?.includes("No access, refresh token")) {
+        specificMessage = "Authentication failed: No access token. Please ensure you are logged in and the application has permission to access Google Sheets. Check server logs for 'oauth2Client has NO access_token' messages in 'google-clients.ts'. This indicates the app couldn't get a token to talk to Google.";
         console.error("🔑🔑🔑 [getReleases] The error 'No access, refresh token...' indicates a fundamental authentication problem. The Google API client in 'src/lib/google-clients.ts' was not provided with a valid OAuth 2.0 access token. Please ensure your OAuth 2.0 flow is correctly implemented and `oauth2Client.setCredentials()` is called with valid tokens. 🔑🔑🔑");
       }
       console.error('Error Stack:', error.stack);
     }
-    // This line (190 in the current full file, may vary slightly) is where the error is propagated to the UI.
+    // This line is where the error is propagated to the UI.
     // If error.message is "No access, refresh token...", it's because the API call failed due to missing authentication.
-    return Promise.reject(new Error(error.message || "Unknown error fetching releases. Check server logs for details."));
+    return Promise.reject(new Error(specificMessage));
   }
 }
 
@@ -222,6 +220,7 @@ export async function getReleaseById(idRilis: string): Promise<ReleaseEntry | nu
     return release || null;
   } catch (error: any) {
     console.error(`🔴 [getReleaseById] Error fetching release by ID ${idRilis}:`, error.message);
+    // Propagate the specific error message from getReleases or other issues
     return Promise.reject(new Error(error.message || `Error fetching release by ID ${idRilis}`));
   }
 }
@@ -262,7 +261,9 @@ async function uploadFileToDrive(file: File, fileName: string): Promise<string |
     console.error(`🔴 [uploadFileToDrive] Error uploading file "${fileName}" to Google Drive:`);
     console.error('Error Message:', error.message);
     let specificMessage = error.message || `Error uploading ${fileName} to Drive.`;
-    if (error.response && error.response.data && error.response.data.error) {
+    if (error.message?.includes("No access, refresh token")) {
+        specificMessage = "Authentication failed for Drive: No access token. Please ensure you are logged in and the application has permission. Check server logs.";
+    } else if (error.response && error.response.data && error.response.data.error) {
       console.error('Google API Error Details for Drive Upload:', JSON.stringify(error.response.data.error, null, 2));
        const apiError = error.response.data.error;
       if (apiError.code === 403) {
@@ -370,7 +371,9 @@ export async function addRelease(formData: FormData): Promise<ReleaseEntry | { e
   } catch (error: any) {
     console.error('🔴 [addRelease] Error adding release to Google Sheets:', error.message);
     let specificError = `Gagal menambahkan rilisan ke Google Sheets: ${error.message || 'Unknown error'}`;
-    if (error.response && error.response.data && error.response.data.error) {
+     if (error.message?.includes("No access, refresh token")) {
+        specificError = "Authentication failed for Sheets: No access token. Please ensure you are logged in and the application has permission.";
+    } else if (error.response && error.response.data && error.response.data.error) {
       console.error('Google API Error Details for Sheets Append:', JSON.stringify(error.response.data.error, null, 2));
       specificError = `Gagal menambahkan rilisan ke Sheets: ${error.response.data.error.message} (Code: ${error.response.data.error.code}). Periksa log server.`;
     }
@@ -412,7 +415,11 @@ export async function updateRelease(idRilis: string, formData: FormData): Promis
     }
   } catch (e: any) {
       console.error('🔴 [updateRelease] Error fetching rows for update:', e.message);
-      return { error: `Gagal mengambil data untuk update: ${e.message}. Periksa log server.` };
+       let fetchErrorMsg = `Gagal mengambil data untuk update: ${e.message}. Periksa log server.`;
+      if (e.message?.includes("No access, refresh token")) {
+        fetchErrorMsg = "Authentication failed: No access token. Cannot fetch data for update.";
+      }
+      return { error: fetchErrorMsg };
   }
 
   if (rowIndexToUpdate === -1) {
@@ -512,7 +519,9 @@ export async function updateRelease(idRilis: string, formData: FormData): Promis
   } catch (error: any) {
     console.error(`🔴 [updateRelease] Error updating release ID ${idRilis} in Google Sheets:`, error.message);
     let specificError = `Gagal memperbarui rilisan di Google Sheets: ${error.message || 'Unknown error'}`;
-    if (error.response && error.response.data && error.response.data.error) {
+    if (error.message?.includes("No access, refresh token")) {
+        specificError = "Authentication failed for Sheets: No access token. Cannot update release.";
+    } else if (error.response && error.response.data && error.response.data.error) {
       console.error('Google API Error Details for Sheets Update:', JSON.stringify(error.response.data.error, null, 2));
       specificError = `Gagal memperbarui rilisan di Sheets: ${error.response.data.error.message} (Code: ${error.response.data.error.code}). Periksa log server.`;
     }
@@ -551,7 +560,11 @@ export async function deleteRelease(idRilis: string): Promise<{ success: boolean
     }
   } catch (e: any) {
       console.error('🔴 [deleteRelease] Error fetching rows for deletion:', e.message);
-      return { success: false, error: `Gagal mengambil data untuk penghapusan: ${e.message}. Periksa log server.` };
+      let fetchDeleteErrorMsg = `Gagal mengambil data untuk penghapusan: ${e.message}. Periksa log server.`;
+      if (e.message?.includes("No access, refresh token")) {
+        fetchDeleteErrorMsg = "Authentication failed: No access token. Cannot fetch data for deletion.";
+      }
+      return { success: false, error: fetchDeleteErrorMsg };
   }
 
   if (rowIndexToDelete === -1) {
@@ -574,7 +587,11 @@ export async function deleteRelease(idRilis: string): Promise<{ success: boolean
     // console.log(`🛡️ [deleteRelease] Sheet ID (gid) for "${SHEET_NAME}" is ${sheetIdForDeletionApi}.`);
   } catch (e: any) {
     console.error('🔴 [deleteRelease] Error fetching sheetId for deletion:', e.message);
-    return { success: false, error: `Gagal mendapatkan metadata sheet untuk penghapusan: ${e.message}. Periksa log server.` };
+    let fetchSheetIdErrorMsg = `Gagal mendapatkan metadata sheet untuk penghapusan: ${e.message}. Periksa log server.`;
+    if (e.message?.includes("No access, refresh token")) {
+        fetchSheetIdErrorMsg = "Authentication failed: No access token. Cannot fetch sheet metadata for deletion.";
+    }
+    return { success: false, error: fetchSheetIdErrorMsg };
   }
 
   // Step 3: Perform the deletion using batchUpdate
@@ -607,11 +624,12 @@ export async function deleteRelease(idRilis: string): Promise<{ success: boolean
   } catch (error: any) {
     console.error(`🔴 [deleteRelease] Error deleting release ID ${idRilis} from Google Sheets:`, error.message);
     let specificError = `Gagal menghapus rilisan dari Google Sheets: ${error.message || 'Unknown error'}`;
-    if (error.response && error.response.data && error.response.data.error) {
+    if (error.message?.includes("No access, refresh token")) {
+        specificError = "Authentication failed for Sheets: No access token. Cannot delete release.";
+    } else if (error.response && error.response.data && error.response.data.error) {
       console.error('Google API Error Details for Sheets Batch Update (Delete):', JSON.stringify(error.response.data.error, null, 2));
       specificError = `Gagal menghapus rilisan dari Sheets: ${error.response.data.error.message} (Code: ${error.response.data.error.code}). Periksa log server.`;
     }
     return { success: false, error: specificError };
   }
 }
-
