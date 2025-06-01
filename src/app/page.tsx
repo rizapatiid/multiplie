@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Card } from '@/components/ui/card';
-import { PlusCircle, Search, Trash2, Music, Edit } from 'lucide-react';
+import { PlusCircle, Search, Trash2, Music, Edit, ListFilter } from 'lucide-react';
 import type { ReleaseEntry, ReleaseStatus } from '@/types';
 import { ReleaseForm, type ReleaseFormValues } from '@/components/releases/release-form';
 import { useToast } from '@/hooks/use-toast';
@@ -60,18 +60,14 @@ export default function ReleasesPage() {
       setEditingRelease(null);
     } else {
       let newIdRilis: string;
-      if (releases.length === 0) {
+      const numericIds = releases
+        .map(r => parseInt(r.idRilis, 10))
+        .filter(id => !isNaN(id));
+
+      if (numericIds.length === 0) {
         newIdRilis = '1';
       } else {
-        const numericIds = releases
-          .map(r => parseInt(r.idRilis, 10))
-          .filter(id => !isNaN(id));
-
-        if (numericIds.length === 0) {
-          newIdRilis = '1';
-        } else {
-          newIdRilis = (Math.max(0, ...numericIds) + 1).toString();
-        }
+        newIdRilis = (Math.max(0, ...numericIds) + 1).toString();
       }
 
       const newRelease: ReleaseEntry = {
@@ -159,9 +155,9 @@ export default function ReleasesPage() {
         </div>
 
         {filteredReleases.length === 0 ? (
-          <div className="text-center py-16 bg-card rounded-lg shadow-md">
+          <div className="text-center py-16"> {/* Removed Card styling */}
             <Music className="mx-auto h-16 w-16 text-primary opacity-50 mb-4" />
-            <h3 className="text-xl font-semibold mb-2">Tidak Ada Rilisan</h3>
+            <h3 className="text-xl font-semibold mb-2 text-foreground">Tidak Ada Rilisan</h3>
             <p className="text-muted-foreground">
               {searchTerm ? "Tidak ada rilisan yang cocok dengan pencarian Anda." : "Belum ada rilisan yang ditambahkan. Klik tombol '+' untuk memulai."}
             </p>
@@ -170,7 +166,7 @@ export default function ReleasesPage() {
           <div className="flex flex-col gap-4">
             {filteredReleases.map((release) => (
               <Card key={release.idRilis} className="w-full overflow-hidden shadow-sm hover:shadow-md transition-shadow duration-200">
-                <div className="flex flex-row items-stretch"> {/* Use items-stretch for equal height columns */}
+                <div className="flex flex-row items-stretch">
                   <Link 
                     href={`/releases/${release.idRilis}`} 
                     className="flex-grow p-3 block hover:bg-muted/30 focus-visible:ring-1 focus-visible:ring-ring rounded-l-lg"
@@ -178,9 +174,9 @@ export default function ReleasesPage() {
                     <div className="flex flex-row items-center gap-3 h-full">
                       <div className="w-20 h-20 flex-shrink-0 relative aspect-square">
                         {release.coverArtUrl ? (
-                          <Image src={release.coverArtUrl} alt={release.judulRilisan} fill className="rounded-md object-cover" data-ai-hint="album cover" />
+                          <Image src={release.coverArtUrl} alt={release.judulRilisan} fill className="rounded-md object-cover" data-ai-hint="album cover"/>
                         ) : (
-                          <Image src="https://placehold.co/80x80.png" alt="Placeholder" fill className="rounded-md object-cover" data-ai-hint="album cover" />
+                          <Image src="https://placehold.co/80x80.png" alt="Placeholder" fill className="rounded-md object-cover" data-ai-hint="album cover"/>
                         )}
                       </div>
                       <div className="flex-1 space-y-0.5 min-w-0">
@@ -204,7 +200,7 @@ export default function ReleasesPage() {
                       variant="outline" 
                       size="sm" 
                       onClick={() => handleOpenEditDialog(release)}
-                      className="px-3 h-9" // Standard sm size
+                      className="px-3 h-9"
                     >
                       <Edit className="h-3.5 w-3.5 mr-1.5" /> Edit
                     </Button>
@@ -212,7 +208,7 @@ export default function ReleasesPage() {
                       variant="destructive" 
                       size="icon" 
                       onClick={() => handleDeleteRelease(release.idRilis)}
-                      className="h-9 w-9" // Square icon button, same height as edit
+                      className="h-9 w-9"
                     >
                       <Trash2 className="h-4 w-4" />
                     </Button>
@@ -263,4 +259,3 @@ export default function ReleasesPage() {
     </div>
   );
 }
-
