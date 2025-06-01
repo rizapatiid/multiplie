@@ -27,7 +27,7 @@ export default function ReleasesPage() {
       const storedReleases = localStorage.getItem(LOCAL_STORAGE_KEY);
       if (storedReleases) {
         try {
-          const parsedReleases = JSON.parse(storedReleases).map((r: ReleaseEntry) => ({
+          const parsedReleases = JSON.parse(storedReleases).map((r: any) => ({ // Use any for r initially
             ...r,
             tanggalTayang: new Date(r.tanggalTayang), // Ensure tanggalTayang is a Date object
           }));
@@ -48,14 +48,12 @@ export default function ReleasesPage() {
 
   const handleAddRelease = (data: ReleaseFormValues) => {
     if (editingRelease) {
-      // Update existing release
       setReleases(prevReleases => 
-        prevReleases.map(r => r.idRilis === editingRelease.idRilis ? { ...editingRelease, ...data } : r)
+        prevReleases.map(r => r.idRilis === editingRelease.idRilis ? { ...r, ...data, idRilis: editingRelease.idRilis } : r)
       );
       toast({ title: "Rilisan Diperbarui", description: `Rilisan "${data.judulRilisan}" telah berhasil diperbarui.` });
       setEditingRelease(null);
     } else {
-      // Add new release
       const newRelease: ReleaseEntry = {
         ...data,
         idRilis: crypto.randomUUID(),
@@ -88,12 +86,25 @@ export default function ReleasesPage() {
     );
   }, [releases, searchTerm]);
 
+  const getStatusColor = (status: ReleaseStatus) => {
+    switch (status) {
+      case 'Upload':
+        return 'bg-blue-100 text-blue-700';
+      case 'Pending Rilis':
+        return 'bg-yellow-100 text-yellow-700';
+      case 'Takedown':
+        return 'bg-red-100 text-red-700';
+      default:
+        return 'bg-gray-100 text-gray-700';
+    }
+  };
+
   return (
     <div className="flex flex-col min-h-screen bg-background">
       <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="container flex h-16 items-center justify-between max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
           <Link href="/" className="text-3xl font-bold font-headline tracking-tight text-primary">
-            TrackStack
+            VortexTunes Digital
           </Link>
           <nav className="flex items-center gap-4">
              <Link href="/" passHref>
@@ -168,11 +179,7 @@ export default function ReleasesPage() {
                   {release.upc && <p><span className="font-medium">UPC:</span> {release.upc}</p>}
                   {release.isrc && <p><span className="font-medium">ISRC:</span> {release.isrc}</p>}
                   <p><span className="font-medium">Tgl Tayang:</span> {format(new Date(release.tanggalTayang), "dd MMM yyyy")}</p>
-                  <p><span className="font-medium">Status:</span> <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${
-                    release.status === 'Published' ? 'bg-green-100 text-green-700' : 
-                    release.status === 'Pending' ? 'bg-yellow-100 text-yellow-700' : 
-                    'bg-gray-100 text-gray-700'
-                  }`}>{release.status}</span></p>
+                  <p><span className="font-medium">Status:</span> <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${getStatusColor(release.status)}`}>{release.status}</span></p>
                 </CardContent>
                 <CardFooter className="flex justify-end gap-2 pt-4">
                   <Button variant="outline" size="sm" onClick={() => handleOpenEditDialog(release)}>Edit</Button>
@@ -187,7 +194,7 @@ export default function ReleasesPage() {
       </main>
        <footer className="py-6 border-t">
         <div className="container max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 text-center text-xs text-muted-foreground">
-          <p className="font-headline">&copy; {new Date().getFullYear()} TrackStack. All rights reserved.</p>
+          <p className="font-headline">&copy; {new Date().getFullYear()} VortexTunes Digital. All rights reserved.</p>
         </div>
       </footer>
     </div>

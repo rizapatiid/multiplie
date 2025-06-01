@@ -17,7 +17,7 @@ import { format } from 'date-fns';
 import type { ReleaseEntry, ReleaseStatus } from '@/types';
 import { cn } from '@/lib/utils';
 
-const releaseStatusOptions: ReleaseStatus[] = ["Pending", "Published", "Archived"];
+const releaseStatusOptions: ReleaseStatus[] = ["Upload", "Pending Rilis", "Takedown"];
 
 const releaseFormSchema = z.object({
   judulRilisan: z.string().min(1, "Judul rilisan tidak boleh kosong"),
@@ -64,7 +64,7 @@ export function ReleaseForm({ onSubmit, initialData, onCancel }: ReleaseFormProp
         status: initialData.status || undefined,
       });
     } else {
-      form.reset({ // Reset to empty for new form
+      form.reset({ 
         judulRilisan: '',
         artist: '',
         upc: '',
@@ -175,9 +175,9 @@ export function ReleaseForm({ onSubmit, initialData, onCancel }: ReleaseFormProp
                     mode="single"
                     selected={field.value}
                     onSelect={field.onChange}
-                    disabled={(date) =>
-                      date > new Date() || date < new Date("1900-01-01")
-                    }
+                    // disabled={(date) =>
+                    //   date > new Date() || date < new Date("1900-01-01")
+                    // }
                     initialFocus
                   />
                 </PopoverContent>

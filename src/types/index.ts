@@ -17,7 +17,7 @@ export interface PlatformSummaryStats {
   trackCount: number;
 }
 
-export type ReleaseStatus = "Pending" | "Published" | "Archived";
+export type ReleaseStatus = "Upload" | "Pending Rilis" | "Takedown";
 
 export interface ReleaseEntry {
   idRilis: string;

@@ -1,10 +1,11 @@
+
 import type { Metadata } from 'next';
 import './globals.css';
 import { Toaster } from "@/components/ui/toaster";
 
 export const metadata: Metadata = {
-  title: 'TrackStack - Music Distribution Analytics',
-  description: 'Import, view, and analyze your music distribution data with TrackStack.',
+  title: 'VortexTunes Digital - Music Distribution Analytics',
+  description: 'Import, view, and analyze your music distribution data with VortexTunes Digital.',
 };
 
 export default function RootLayout({
