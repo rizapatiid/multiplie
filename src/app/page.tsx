@@ -31,7 +31,7 @@ export default function ReleasesPage() {
         try {
           const parsedReleases = JSON.parse(storedReleases).map((r: any) => ({
             ...r,
-            tanggalTayang: new Date(r.tanggalTayang), 
+            tanggalTayang: new Date(r.tanggalTayang),
           }));
           setReleases(parsedReleases);
         } catch (error) {
@@ -54,7 +54,7 @@ export default function ReleasesPage() {
 
   const handleAddRelease = (data: ReleaseFormValues) => {
     if (editingRelease) {
-      setReleases(prevReleases => 
+      setReleases(prevReleases =>
         prevReleases.map(r => r.idRilis === editingRelease.idRilis ? { ...editingRelease, ...data, tanggalTayang: new Date(data.tanggalTayang) } : r)
       );
       toast({ title: "Rilisan Diperbarui", description: `Rilisan "${data.judulRilisan}" telah berhasil diperbarui.` });
@@ -67,7 +67,7 @@ export default function ReleasesPage() {
         const numericIds = releases
           .map(r => parseInt(r.idRilis, 10))
           .filter(id => !isNaN(id));
-        
+
         if (numericIds.length === 0) {
           newIdRilis = '1';
         } else {
@@ -90,7 +90,7 @@ export default function ReleasesPage() {
     setReleases(prevReleases => prevReleases.filter(r => r.idRilis !== idRilis));
     toast({ title: "Rilisan Dihapus", description: "Rilisan telah berhasil dihapus.", variant: "destructive" });
   };
-  
+
   const handleOpenEditDialog = (release: ReleaseEntry) => {
     setEditingRelease(release);
     setIsAddDialogOpen(true);
@@ -111,6 +111,7 @@ export default function ReleasesPage() {
       if (!isNaN(idA) && !isNaN(idB)) {
         return idB - idA;
       }
+      // Fallback sort by date if IDs are not numeric (should not happen with new logic, but good for safety)
       return new Date(b.tanggalTayang).getTime() - new Date(a.tanggalTayang).getTime();
     });
   }, [releases, searchTerm]);
@@ -166,35 +167,39 @@ export default function ReleasesPage() {
             </p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="flex flex-col gap-6">
             {filteredReleases.map((release) => (
-              <Card key={release.idRilis} className="flex flex-col justify-between">
-                <CardHeader>
-                  <div className="flex items-start gap-4">
+              <Card key={release.idRilis} className="w-full flex flex-col sm:flex-row">
+                <CardHeader className="p-4 sm:p-6 flex-shrink-0 sm:w-1/4 flex flex-col sm:flex-row items-start gap-4">
+                   <div className="w-full sm:w-auto flex-shrink-0 mb-2 sm:mb-0">
                     {release.coverArtUrl ? (
-                      <Image src={release.coverArtUrl} alt={release.judulRilisan} width={64} height={64} className="rounded-md object-cover aspect-square" data-ai-hint="album cover" />
+                      <Image src={release.coverArtUrl} alt={release.judulRilisan} width={80} height={80} className="rounded-md object-cover aspect-square mx-auto sm:mx-0" data-ai-hint="album cover" />
                     ) : (
-                      <Image src="https://placehold.co/64x64.png" alt="Placeholder" width={64} height={64} className="rounded-md object-cover aspect-square" data-ai-hint="album cover" />
+                      <Image src="https://placehold.co/80x80.png" alt="Placeholder" width={80} height={80} className="rounded-md object-cover aspect-square mx-auto sm:mx-0" data-ai-hint="album cover" />
                     )}
-                    <div className="flex-1">
-                      <CardTitle className="truncate text-lg" title={release.judulRilisan}>{release.judulRilisan}</CardTitle>
-                      <CardDescription>{release.artist}</CardDescription>
-                    </div>
+                  </div>
+                  <div className="flex-1 text-center sm:text-left">
+                    <CardTitle className="text-base sm:text-lg leading-tight" title={release.judulRilisan}>{release.judulRilisan}</CardTitle>
+                    <CardDescription className="text-sm">{release.artist}</CardDescription>
                   </div>
                 </CardHeader>
-                <CardContent className="space-y-1 text-sm pt-2">
+                <CardContent className="p-4 sm:p-6 flex-grow space-y-1 text-sm">
                   <p><span className="font-medium">ID Rilis:</span> {release.idRilis}</p>
                   {release.upc && <p><span className="font-medium">UPC:</span> {release.upc}</p>}
                   {release.isrc && <p><span className="font-medium">ISRC:</span> {release.isrc}</p>}
                   <p><span className="font-medium">Tgl Tayang:</span> {format(new Date(release.tanggalTayang), "dd MMM yyyy")}</p>
                   <p><span className="font-medium">Status:</span> <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${getStatusColor(release.status)}`}>{release.status}</span></p>
                   {release.audioFileName && (
-                    <p className="flex items-center text-muted-foreground"><FileAudio className="mr-1.5 h-4 w-4" /><span className="font-medium mr-1">Audio:</span> {release.audioFileName}</p>
+                    <p className="flex items-center text-muted-foreground text-xs truncate">
+                      <FileAudio className="mr-1.5 h-3 w-3 flex-shrink-0" />
+                      <span className="font-medium mr-1">Audio:</span> 
+                      <span className="truncate" title={release.audioFileName}>{release.audioFileName}</span>
+                    </p>
                   )}
                 </CardContent>
-                <CardFooter className="flex justify-end gap-2 pt-4">
-                  <Button variant="outline" size="sm" onClick={() => handleOpenEditDialog(release)}>Edit</Button>
-                  <Button variant="destructive" size="sm" onClick={() => handleDeleteRelease(release.idRilis)}>
+                <CardFooter className="p-4 sm:p-6 flex flex-row sm:flex-col justify-end sm:justify-center items-center gap-2 border-t sm:border-t-0 sm:border-l">
+                  <Button variant="outline" size="sm" onClick={() => handleOpenEditDialog(release)} className="w-full sm:w-auto">Edit</Button>
+                  <Button variant="destructive" size="sm" onClick={() => handleDeleteRelease(release.idRilis)} className="w-full sm:w-auto">
                     <Trash2 className="h-4 w-4"/>
                   </Button>
                 </CardFooter>
@@ -209,7 +214,7 @@ export default function ReleasesPage() {
         if (!open) setEditingRelease(null);
       }}>
         <DialogTrigger asChild>
-          <Button 
+          <Button
             onClick={handleOpenAddDialog}
             variant="default"
             className="fixed bottom-6 right-6 z-50 h-14 w-14 rounded-full shadow-lg flex items-center justify-center p-0"
@@ -222,9 +227,9 @@ export default function ReleasesPage() {
           <DialogHeader>
             <DialogTitle>{editingRelease ? "Edit Rilisan" : "Tambah Rilisan Baru"}</DialogTitle>
           </DialogHeader>
-          <ReleaseForm 
-            onSubmit={handleAddRelease} 
-            initialData={editingRelease || undefined} 
+          <ReleaseForm
+            onSubmit={handleAddRelease}
+            initialData={editingRelease || undefined}
             onCancel={() => {
               setIsAddDialogOpen(false);
               setEditingRelease(null);
@@ -232,14 +237,16 @@ export default function ReleasesPage() {
           />
         </DialogContent>
       </Dialog>
-      
+
        <footer className="py-6 border-t">
         <div className="container max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 text-center text-xs text-muted-foreground">
           <p className="font-headline">
-            &copy; {currentYear !== null ? currentYear : '...'} VortexTunes Digital. All rights reserved.
+            &copy; {currentYear !== null ? currentYear : new Date().getFullYear()} VortexTunes Digital. All rights reserved.
           </p>
         </div>
       </footer>
     </div>
   );
 }
+
+    
