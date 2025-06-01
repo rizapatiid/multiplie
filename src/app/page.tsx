@@ -50,14 +50,30 @@ export default function ReleasesPage() {
   const handleAddRelease = (data: ReleaseFormValues) => {
     if (editingRelease) {
       setReleases(prevReleases => 
-        prevReleases.map(r => r.idRilis === editingRelease.idRilis ? { ...editingRelease, ...data } : r)
+        prevReleases.map(r => r.idRilis === editingRelease.idRilis ? { ...editingRelease, ...data, tanggalTayang: new Date(data.tanggalTayang) } : r)
       );
       toast({ title: "Rilisan Diperbarui", description: `Rilisan "${data.judulRilisan}" telah berhasil diperbarui.` });
       setEditingRelease(null);
     } else {
+      let newIdRilis: string;
+      if (releases.length === 0) {
+        newIdRilis = '1';
+      } else {
+        const numericIds = releases
+          .map(r => parseInt(r.idRilis, 10))
+          .filter(id => !isNaN(id));
+        
+        if (numericIds.length === 0) {
+          newIdRilis = '1';
+        } else {
+          newIdRilis = (Math.max(0, ...numericIds) + 1).toString();
+        }
+      }
+
       const newRelease: ReleaseEntry = {
         ...data,
-        idRilis: crypto.randomUUID(),
+        idRilis: newIdRilis,
+        tanggalTayang: new Date(data.tanggalTayang),
       };
       setReleases(prevReleases => [newRelease, ...prevReleases]);
       toast({ title: "Rilisan Ditambahkan", description: `Rilisan "${data.judulRilisan}" telah berhasil ditambahkan.` });
@@ -84,7 +100,16 @@ export default function ReleasesPage() {
     return releases.filter(release =>
       release.judulRilisan.toLowerCase().includes(searchTerm.toLowerCase()) ||
       release.artist.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    ).sort((a, b) => {
+      // Sort by ID Rilis (numeric descending) to show newest first if IDs are numeric
+      const idA = parseInt(a.idRilis, 10);
+      const idB = parseInt(b.idRilis, 10);
+      if (!isNaN(idA) && !isNaN(idB)) {
+        return idB - idA;
+      }
+      // Fallback sort by tanggalTayang if IDs are not purely numeric or for mixed cases
+      return new Date(b.tanggalTayang).getTime() - new Date(a.tanggalTayang).getTime();
+    });
   }, [releases, searchTerm]);
 
   const getStatusColor = (status: ReleaseStatus) => {
@@ -117,14 +142,14 @@ export default function ReleasesPage() {
                 placeholder="Cari rilisan..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10 w-full sm:w-64 h-9" // Adjusted height to match typical header inputs
+                className="pl-10 w-full sm:w-64 h-9"
               />
             </div>
-            <nav className="hidden sm:flex items-center"> {/* Hide on small screens if search takes too much space */}
+            {/* <nav className="hidden sm:flex items-center">
               <Link href="/" passHref>
                 <Button variant="outline" size="sm" className="border-primary text-primary">Manajemen Rilisan</Button>
               </Link>
-            </nav>
+            </nav> */}
           </div>
         </div>
       </header>
