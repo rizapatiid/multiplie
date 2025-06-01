@@ -6,12 +6,11 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Card } from '@/components/ui/card';
-import { PlusCircle, Search, Trash2, Music, FileAudio, Edit } from 'lucide-react';
+import { PlusCircle, Search, Trash2, Music, Edit } from 'lucide-react';
 import type { ReleaseEntry, ReleaseStatus } from '@/types';
 import { ReleaseForm, type ReleaseFormValues } from '@/components/releases/release-form';
 import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
-import { format } from 'date-fns';
 import Image from 'next/image';
 
 const LOCAL_STORAGE_KEY = 'trackStackReleases';
@@ -171,25 +170,28 @@ export default function ReleasesPage() {
           <div className="flex flex-col gap-4">
             {filteredReleases.map((release) => (
               <Card key={release.idRilis} className="w-full overflow-hidden shadow-sm hover:shadow-md transition-shadow duration-200">
-                <div className="flex flex-col sm:flex-row">
-                  <Link href={`/releases/${release.idRilis}`} className="flex-grow p-4 block hover:bg-muted/30 focus-visible:ring-1 focus-visible:ring-ring rounded-t-lg sm:rounded-l-lg sm:rounded-tr-none">
-                    <div className="flex flex-col sm:flex-row items-start gap-4 w-full">
-                      <div className="w-full sm:w-20 h-auto sm:h-20 flex-shrink-0 relative aspect-square">
+                <div className="flex flex-row items-stretch"> {/* Use items-stretch for equal height columns */}
+                  <Link 
+                    href={`/releases/${release.idRilis}`} 
+                    className="flex-grow p-3 block hover:bg-muted/30 focus-visible:ring-1 focus-visible:ring-ring rounded-l-lg"
+                  >
+                    <div className="flex flex-row items-center gap-3 h-full">
+                      <div className="w-20 h-20 flex-shrink-0 relative aspect-square">
                         {release.coverArtUrl ? (
                           <Image src={release.coverArtUrl} alt={release.judulRilisan} fill className="rounded-md object-cover" data-ai-hint="album cover" />
                         ) : (
                           <Image src="https://placehold.co/80x80.png" alt="Placeholder" fill className="rounded-md object-cover" data-ai-hint="album cover" />
                         )}
                       </div>
-                      <div className="flex-1 space-y-1 min-w-0 mt-2 sm:mt-0">
+                      <div className="flex-1 space-y-0.5 min-w-0">
                         <p className="text-xs text-muted-foreground truncate" title={release.idRilis}>ID: {release.idRilis}</p>
-                        <h3 className="text-base sm:text-lg font-semibold leading-tight truncate" title={release.judulRilisan}>
+                        <h3 className="text-base font-semibold leading-tight truncate" title={release.judulRilisan}>
                           {release.judulRilisan}
                         </h3>
                         <p className="text-sm text-muted-foreground truncate" title={release.artist}>
                           {release.artist}
                         </p>
-                        <p className="text-sm mt-1">
+                        <p className="text-xs mt-1">
                           <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${getStatusColor(release.status)}`}>
                             {release.status}
                           </span>
@@ -197,12 +199,22 @@ export default function ReleasesPage() {
                       </div>
                     </div>
                   </Link>
-                  <div className="p-3 sm:p-4 border-t sm:border-t-0 sm:border-l flex flex-row sm:flex-col items-center justify-end sm:justify-center gap-2 bg-muted/20 rounded-b-lg sm:rounded-r-lg sm:rounded-bl-none">
-                    <Button variant="outline" size="sm" onClick={() => handleOpenEditDialog(release)} className="h-8 px-3 text-xs sm:text-sm">
-                      <Edit className="h-3 w-3 sm:mr-1" /> <span className="hidden sm:inline">Edit</span>
+                  <div className="flex flex-col items-center justify-center gap-2 p-3 border-l bg-muted/25 rounded-r-lg">
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      onClick={() => handleOpenEditDialog(release)}
+                      className="px-3 h-9" // Standard sm size
+                    >
+                      <Edit className="h-3.5 w-3.5 mr-1.5" /> Edit
                     </Button>
-                    <Button variant="destructive" size="sm" onClick={() => handleDeleteRelease(release.idRilis)} className="h-8 px-3">
-                      <Trash2 className="h-3 w-3 sm:h-4 sm:w-4" />
+                    <Button 
+                      variant="destructive" 
+                      size="icon" 
+                      onClick={() => handleDeleteRelease(release.idRilis)}
+                      className="h-9 w-9" // Square icon button, same height as edit
+                    >
+                      <Trash2 className="h-4 w-4" />
                     </Button>
                   </div>
                 </div>
@@ -251,4 +263,4 @@ export default function ReleasesPage() {
     </div>
   );
 }
-    
+
