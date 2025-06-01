@@ -13,6 +13,8 @@ import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
 import Image from 'next/image';
 import { ThemeToggleButton } from '@/components/theme-toggle-button';
+import VortexTunesLogo from '@/components/icons/VortexTunesLogo';
+
 
 const LOCAL_STORAGE_KEY = 'trackStackReleases';
 
@@ -111,6 +113,7 @@ export default function ReleasesPage() {
       }
       if (!isNaN(idA)) return -1;
       if (!isNaN(idB)) return 1;
+      // Fallback for non-numeric or mixed IDs, sort by date
       return new Date(b.tanggalTayang).getTime() - new Date(a.tanggalTayang).getTime();
     });
   }, [releases, searchTerm]);
@@ -120,7 +123,7 @@ export default function ReleasesPage() {
       case 'Upload':
         return 'bg-blue-500 text-white';
       case 'Pending':
-        return 'bg-yellow-500 text-white';
+        return 'bg-yellow-500 text-black'; // Ensure text readable
       case 'Rilis':
         return 'bg-green-500 text-white';
       case 'Takedown':
@@ -134,8 +137,8 @@ export default function ReleasesPage() {
     <div className="flex flex-col min-h-screen">
       <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="container flex h-16 items-center justify-between max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-          <Link href="/" className="text-xl sm:text-2xl font-bold font-headline tracking-tight text-primary">
-            VortexTunes Digital
+          <Link href="/" className="flex items-center">
+            <VortexTunesLogo className="h-7 sm:h-8 w-auto" />
           </Link>
           <div className="flex items-center gap-2 sm:gap-4">
             <div className="relative">
@@ -257,7 +260,7 @@ export default function ReleasesPage() {
        <footer className="py-6 border-t">
         <div className="container max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 text-center text-xs text-muted-foreground">
           <p className="font-headline">
-            &copy; {currentYear !== null ? currentYear : new Date().getFullYear()} VortexTunes Digital. All rights reserved.
+            &copy; {currentYear !== null ? currentYear : new Date().getFullYear()} VortexTunes. All rights reserved.
           </p>
         </div>
       </footer>

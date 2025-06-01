@@ -5,8 +5,8 @@ import { Toaster } from "@/components/ui/toaster";
 import { ThemeProvider } from '@/components/theme-provider';
 
 export const metadata: Metadata = {
-  title: 'VortexTunes Digital - Manajemen Rilisan',
-  description: 'Kelola rilisan musik digital Anda dengan VortexTunes Digital.',
+  title: 'VortexTunes - Manajemen Rilisan',
+  description: 'Kelola rilisan musik digital Anda dengan VortexTunes.',
 };
 
 export default function RootLayout({

@@ -13,6 +13,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import type { ReleaseEntry, ReleaseStatus } from '@/types';
 import { ThemeToggleButton } from '@/components/theme-toggle-button';
+import VortexTunesLogo from '@/components/icons/VortexTunesLogo';
 
 const LOCAL_STORAGE_KEY = 'trackStackReleases';
 
@@ -64,7 +65,7 @@ export default function ReleaseDetailPage() {
       case 'Upload':
         return 'bg-blue-500 hover:bg-blue-600';
       case 'Pending':
-        return 'bg-yellow-500 hover:bg-yellow-600 text-black'; // Ensure text is readable on yellow
+        return 'bg-yellow-500 hover:bg-yellow-600 text-black'; 
       case 'Rilis':
         return 'bg-green-500 hover:bg-green-600';
       case 'Takedown':
@@ -135,12 +136,18 @@ export default function ReleaseDetailPage() {
     <div className="flex flex-col min-h-screen">
        <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="container flex h-16 items-center justify-between max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-           <Button variant="ghost" size="icon" onClick={() => router.back()} className="hover:bg-muted">
+            <Button variant="ghost" size="icon" onClick={() => router.back()} className="hover:bg-muted">
               <ArrowLeft className="h-5 w-5" />
-           </Button>
-          <h1 className="text-xl sm:text-2xl font-bold font-headline tracking-tight text-primary truncate px-2 text-center" title={release.judulRilisan}>
-            {release.judulRilisan}
-          </h1>
+            </Button>
+            <div className="flex-1 text-center px-2">
+              {release.judulRilisan ? (
+                <h1 className="text-lg sm:text-xl font-bold font-headline tracking-tight text-primary truncate" title={release.judulRilisan}>
+                  {release.judulRilisan}
+                </h1>
+              ) : (
+                <VortexTunesLogo className="h-7 sm:h-8 w-auto inline-block" />
+              )}
+            </div>
            <div className="w-10"><ThemeToggleButton /></div>
         </div>
       </header>
@@ -242,7 +249,7 @@ export default function ReleaseDetailPage() {
       <footer className="py-6 border-t">
         <div className="container max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center text-xs text-muted-foreground">
           <p className="font-headline">
-             &copy; {currentYear !== null ? currentYear : new Date().getFullYear()} VortexTunes Digital. All rights reserved.
+             &copy; {currentYear !== null ? currentYear : new Date().getFullYear()} VortexTunes. All rights reserved.
           </p>
         </div>
       </footer>
