@@ -4,60 +4,83 @@
 import { google } from 'googleapis';
 import type { OAuth2Client } from 'google-auth-library';
 
-// Ini adalah placeholder. Anda perlu mengimplementasikan cara mendapatkan dan menyegarkan token OAuth.
-// Mungkin menggunakan library seperti next-auth atau implementasi kustom.
+// Jika Anda menggunakan next-auth, ini adalah tempat Anda akan mengimpornya
+// import { getServerSession } from "next-auth/next"
+// import { authOptions } from "@/app/api/auth/[...nextauth]/route" // Ganti dengan path yang benar ke konfigurasi authOptions Anda
+
 async function getAuthenticatedClient(): Promise<OAuth2Client> {
   const clientId = process.env.GOOGLE_CLIENT_ID;
   const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
-  const redirectUri = `${process.env.NEXT_PUBLIC_APP_URL}/api/auth/callback/google`; // Sesuaikan jika callback Anda berbeda
+  // Pastikan NEXT_PUBLIC_APP_URL di .env.local sudah benar (misal: http://localhost:9002)
+  const redirectUri = `${process.env.NEXT_PUBLIC_APP_URL}/api/auth/callback/google`; 
 
   if (!clientId || !clientSecret) {
-    const errorMsg = "🔴 FATAL: GOOGLE_CLIENT_ID or GOOGLE_CLIENT_SECRET is missing in your .env.local file. Please ensure they are set correctly and restart your server. Cannot create OAuth2 client.";
+    const errorMsg = "🔴 FATAL: GOOGLE_CLIENT_ID or GOOGLE_CLIENT_SECRET is missing. Check .env.local and restart server.";
     console.error(errorMsg);
-    // Alih-alih melempar error di sini, kita biarkan panggilan API gagal
-    // return Promise.reject(new Error(errorMsg)); // Baris ini diubah
+    // Tidak melempar error di sini agar panggilan API yang sebenarnya yang gagal dan ditangkap oleh UI
   }
-
+  
   if (!process.env.NEXT_PUBLIC_APP_URL) {
-    console.warn("⚠️ WARNING: NEXT_PUBLIC_APP_URL is not set in .env.local. This might be needed for the redirect URI.");
+    console.warn("⚠️ WARNING: NEXT_PUBLIC_APP_URL is not set in .env.local. This is crucial for the OAuth redirect URI. Please set it (e.g., NEXT_PUBLIC_APP_URL=\"http://localhost:9002\") and restart server.");
   }
 
   const oauth2Client = new google.auth.OAuth2(clientId, clientSecret, redirectUri);
 
-  // !! KRITIKAL: Implementasikan pengambilan dan pengaturan token yang sebenarnya di sini !!
-  // Ini adalah bagian paling penting untuk membuat koneksi API berfungsi.
-  // Anda perlu mendapatkan access_token (dan idealnya refresh_token) setelah pengguna login
-  // dan memberikan izin, lalu mengaturnya di oauth2Client.
+  //---------------------------------------------------------------------------
+  // !!! KRITIKAL: IMPLEMENTASI LOGIKA OTENTIKASI (PENGAMBILAN TOKEN) DI SINI !!!
+  //---------------------------------------------------------------------------
+  // Bagian ini adalah yang PALING PENTING dan perlu Anda implementasikan.
+  // Anda perlu cara untuk mendapatkan access_token (dan idealnya refresh_token)
+  // setelah pengguna login dan memberikan izin.
   //
-  // Contoh (hipotetis, sesuaikan dengan alur auth Anda, misal dengan next-auth):
-  // const session = await getSession(); // Fungsi untuk mendapatkan sesi (misal dari next-auth)
-  // if (session?.accessToken) {
-  //   oauth2Client.setCredentials({
-  //     access_token: session.accessToken,
-  //     refresh_token: session.refreshToken, // Jika Anda menyimpannya
-  //     // expiry_date: ... // Jika ada
-  //   });
-  //   console.log("🔧 [getAuthenticatedClient] OAuth2 client configured with tokens.");
-  // } else {
-  //   console.warn("⚠️ [getAuthenticatedClient] OAuth2 client does NOT have access tokens. API calls to Google will fail. Implement token retrieval and setting.");
-  // }
+  // **Jika menggunakan `next-auth` (SANGAT DISARANKAN):**
+  // 1. Pastikan `next-auth` sudah terinstall (`npm install next-auth`).
+  // 2. Konfigurasikan Google Provider di `src/app/api/auth/[...nextauth]/route.ts` (atau .js).
+  //    Gunakan `GOOGLE_CLIENT_ID` dan `GOOGLE_CLIENT_SECRET` Anda.
+  // 3. Dalam callback JWT dan session di `next-auth`, pastikan `accessToken` dan `refreshToken`
+  //    disimpan dan tersedia di objek `session`.
+  // 4. Di sini, Anda akan menggunakan `getServerSession` untuk mendapatkan sesi pengguna
+  //    dan mengambil tokennya.
+  //
+  // **Contoh Placeholder dengan `next-auth` (sesuaikan dengan implementasi Anda):**
+  /*
+  try {
+    const session = await getServerSession(authOptions); // authOptions dari file [...nextauth]
+    if (session && session.accessToken) { // Pastikan accessToken ada di tipe session Anda
+      oauth2Client.setCredentials({
+        access_token: session.accessToken as string,
+        // refresh_token: session.refreshToken as string | undefined, // Jika Anda juga menyimpan dan mengelola refresh token
+      });
+      console.log("🔧 [getAuthenticatedClient] OAuth2 client configured with tokens from next-auth session.");
 
-  // Jika Anda memiliki refresh token dan access token mungkin kedaluwarsa:
-  // if (oauth2Client.isTokenExpiring() && oauth2Client.credentials.refresh_token) {
-  //   try {
-  //     const { credentials } = await oauth2Client.refreshAccessToken();
-  //     oauth2Client.setCredentials(credentials);
-  //     // Simpan token baru yang di-refresh (misalnya, perbarui di database/sesi Anda)
-  //     console.log("🔑 [getAuthenticatedClient] Access token refreshed successfully.");
-  //   } catch (error) {
-  //     console.error("🚨 [getAuthenticatedClient] Error refreshing access token:", error);
-  //     // Tangani error refresh token (misalnya, minta pengguna login ulang)
-  //     // throw new Error("Failed to refresh access token. Please re-authenticate."); // Mungkin lebih baik biarkan panggilan API selanjutnya gagal
-  //   }
-  // }
-  
+      // Opsional: Logika untuk refresh token jika access token akan kedaluwarsa
+      // if (oauth2Client.isTokenExpiring() && session.refreshToken) {
+      //   console.log("⏳ [getAuthenticatedClient] Access token is expiring, attempting to refresh...");
+      //   try {
+      //     const { tokens } = await oauth2Client.refreshAccessToken();
+      //     oauth2Client.setCredentials(tokens);
+      //     console.log("🔑 [getAuthenticatedClient] Access token refreshed successfully using next-auth refresh token.");
+      //     // TODO: Anda mungkin perlu memperbarui token di sesi next-auth jika di-refresh di sini.
+      //   } catch (refreshError: any) {
+      //     console.error("🚨 [getAuthenticatedClient] Error refreshing access token:", refreshError.message);
+      //     // Tangani error refresh token (misalnya, minta pengguna login ulang)
+      //   }
+      // }
+
+    } else {
+      console.warn("⚠️ [getAuthenticatedClient] No valid session or access token found via next-auth. Google API calls will likely fail. User needs to login.");
+    }
+  } catch (sessionError: any) {
+    console.error("🔴 [getAuthenticatedClient] Error getting session for OAuth tokens:", sessionError.message);
+  }
+  */
+  //---------------------------------------------------------------------------
+  // !!! AKHIR BAGIAN IMPLEMENTASI TOKEN !!!
+  //---------------------------------------------------------------------------
+
+
   if (!oauth2Client.credentials.access_token && !oauth2Client.credentials.refresh_token) {
-    console.warn("🕵️ [getAuthenticatedClient] Reminder: OAuth2 client does NOT have an access_token or refresh_token. Google API calls will likely fail due to missing authentication. Implement full OAuth 2.0 token management (retrieval, setting, and refresh).");
+    console.warn("🕵️ [getAuthenticatedClient] Reminder: OAuth2 client does NOT have an access_token or refresh_token. This means authentication with Google has not been completed. Implement token retrieval (e.g., via next-auth) and setting credentials on oauth2Client. Google API calls will fail.");
   }
 
   return oauth2Client;
@@ -69,6 +92,6 @@ export async function getSheetsClient() {
 }
 
 export async function getDriveClient() {
-  const auth = await getDriveClient(); // Typo here, should be getAuthenticatedClient()
+  const auth = await getAuthenticatedClient(); // Sebelumnya ada typo, memanggil dirinya sendiri
   return google.drive({ version: 'v3', auth });
 }
