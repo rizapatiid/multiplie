@@ -21,6 +21,7 @@ export default function ReleasesPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [editingRelease, setEditingRelease] = useState<ReleaseEntry | null>(null);
+  const [currentYear, setCurrentYear] = useState<number | null>(null);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -46,6 +47,10 @@ export default function ReleasesPage() {
       localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(releases));
     }
   }, [releases]);
+
+  useEffect(() => {
+    setCurrentYear(new Date().getFullYear());
+  }, []);
 
   const handleAddRelease = (data: ReleaseFormValues) => {
     if (editingRelease) {
@@ -101,13 +106,11 @@ export default function ReleasesPage() {
       release.judulRilisan.toLowerCase().includes(searchTerm.toLowerCase()) ||
       release.artist.toLowerCase().includes(searchTerm.toLowerCase())
     ).sort((a, b) => {
-      // Sort by ID Rilis (numeric descending) to show newest first if IDs are numeric
       const idA = parseInt(a.idRilis, 10);
       const idB = parseInt(b.idRilis, 10);
       if (!isNaN(idA) && !isNaN(idB)) {
         return idB - idA;
       }
-      // Fallback sort by tanggalTayang if IDs are not purely numeric or for mixed cases
       return new Date(b.tanggalTayang).getTime() - new Date(a.tanggalTayang).getTime();
     });
   }, [releases, searchTerm]);
@@ -145,11 +148,6 @@ export default function ReleasesPage() {
                 className="pl-10 w-full sm:w-64 h-9"
               />
             </div>
-            {/* <nav className="hidden sm:flex items-center">
-              <Link href="/" passHref>
-                <Button variant="outline" size="sm" className="border-primary text-primary">Manajemen Rilisan</Button>
-              </Link>
-            </nav> */}
           </div>
         </div>
       </header>
@@ -237,7 +235,9 @@ export default function ReleasesPage() {
       
        <footer className="py-6 border-t">
         <div className="container max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 text-center text-xs text-muted-foreground">
-          <p className="font-headline">&copy; {new Date().getFullYear()} VortexTunes Digital. All rights reserved.</p>
+          <p className="font-headline">
+            &copy; {currentYear !== null ? currentYear : '...'} VortexTunes Digital. All rights reserved.
+          </p>
         </div>
       </footer>
     </div>
