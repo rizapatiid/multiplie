@@ -5,7 +5,8 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card } from '@/components/ui/card'; // CardDescription, CardFooter, CardHeader, CardTitle, CardContent removed as direct children
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { PlusCircle, Search, Trash2, Music, FileAudio } from 'lucide-react';
 import type { ReleaseEntry, ReleaseStatus } from '@/types';
 import { ReleaseForm, type ReleaseFormValues } from '@/components/releases/release-form';
@@ -69,7 +70,7 @@ export default function ReleasesPage() {
           .filter(id => !isNaN(id));
 
         if (numericIds.length === 0) {
-          newIdRilis = '1';
+          newIdRilis = '1'; // Fallback if all existing IDs are non-numeric for some reason
         } else {
           newIdRilis = (Math.max(0, ...numericIds) + 1).toString();
         }
@@ -108,11 +109,15 @@ export default function ReleasesPage() {
     ).sort((a, b) => {
       const idA = parseInt(a.idRilis, 10);
       const idB = parseInt(b.idRilis, 10);
+      // Sort by numeric ID descending if both are numbers
       if (!isNaN(idA) && !isNaN(idB)) {
         return idB - idA;
       }
-      // Fallback sort by date if IDs are not numeric (should not happen with new logic, but good for safety)
-      return new Date(b.tanggalTayang).getTime() - new Date(a.tanggalTayang).getTime();
+      // If one is not a number, or both are not numbers, fall back to date or original order for stability
+      // This ensures new numeric IDs are generally at the top
+      if (!isNaN(idA)) return -1; // Keep numeric IDs before non-numeric
+      if (!isNaN(idB)) return 1;  // Keep numeric IDs before non-numeric
+      return new Date(b.tanggalTayang).getTime() - new Date(a.tanggalTayang).getTime(); // Fallback for non-numeric IDs
     });
   }, [releases, searchTerm]);
 
@@ -135,10 +140,10 @@ export default function ReleasesPage() {
     <div className="flex flex-col min-h-screen bg-background">
       <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="container flex h-16 items-center justify-between max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-          <Link href="/" className="text-3xl font-bold font-headline tracking-tight text-primary">
+          <Link href="/" className="text-xl sm:text-2xl font-bold font-headline tracking-tight text-primary">
             VortexTunes Digital
           </Link>
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2 sm:gap-4">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
@@ -146,7 +151,7 @@ export default function ReleasesPage() {
                 placeholder="Cari rilisan..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10 w-full sm:w-64 h-9"
+                className="pl-10 w-40 sm:w-64 h-9 text-sm"
               />
             </div>
           </div>
@@ -167,42 +172,58 @@ export default function ReleasesPage() {
             </p>
           </div>
         ) : (
-          <div className="flex flex-col gap-6">
+          <div className="flex flex-col gap-4"> {/* Changed gap from 6 to 4 */}
             {filteredReleases.map((release) => (
-              <Card key={release.idRilis} className="w-full flex flex-col sm:flex-row">
-                <CardHeader className="p-4 sm:p-6 flex-shrink-0 sm:w-1/4 flex flex-col sm:flex-row items-start gap-4">
-                   <div className="w-full sm:w-auto flex-shrink-0 mb-2 sm:mb-0">
-                    {release.coverArtUrl ? (
-                      <Image src={release.coverArtUrl} alt={release.judulRilisan} width={80} height={80} className="rounded-md object-cover aspect-square mx-auto sm:mx-0" data-ai-hint="album cover" />
-                    ) : (
-                      <Image src="https://placehold.co/80x80.png" alt="Placeholder" width={80} height={80} className="rounded-md object-cover aspect-square mx-auto sm:mx-0" data-ai-hint="album cover" />
-                    )}
-                  </div>
-                  <div className="flex-1 text-center sm:text-left">
-                    <CardTitle className="text-base sm:text-lg leading-tight" title={release.judulRilisan}>{release.judulRilisan}</CardTitle>
-                    <CardDescription className="text-sm">{release.artist}</CardDescription>
-                  </div>
-                </CardHeader>
-                <CardContent className="p-4 sm:p-6 flex-grow space-y-1 text-sm">
-                  <p><span className="font-medium">ID Rilis:</span> {release.idRilis}</p>
-                  {release.upc && <p><span className="font-medium">UPC:</span> {release.upc}</p>}
-                  {release.isrc && <p><span className="font-medium">ISRC:</span> {release.isrc}</p>}
-                  <p><span className="font-medium">Tgl Tayang:</span> {format(new Date(release.tanggalTayang), "dd MMM yyyy")}</p>
-                  <p><span className="font-medium">Status:</span> <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${getStatusColor(release.status)}`}>{release.status}</span></p>
-                  {release.audioFileName && (
-                    <p className="flex items-center text-muted-foreground text-xs truncate">
-                      <FileAudio className="mr-1.5 h-3 w-3 flex-shrink-0" />
-                      <span className="font-medium mr-1">Audio:</span> 
-                      <span className="truncate" title={release.audioFileName}>{release.audioFileName}</span>
-                    </p>
-                  )}
-                </CardContent>
-                <CardFooter className="p-4 sm:p-6 flex flex-row sm:flex-col justify-end sm:justify-center items-center gap-2 border-t sm:border-t-0 sm:border-l">
-                  <Button variant="outline" size="sm" onClick={() => handleOpenEditDialog(release)} className="w-full sm:w-auto">Edit</Button>
-                  <Button variant="destructive" size="sm" onClick={() => handleDeleteRelease(release.idRilis)} className="w-full sm:w-auto">
-                    <Trash2 className="h-4 w-4"/>
+              <Card key={release.idRilis} className="w-full overflow-hidden">
+                <Accordion type="single" collapsible className="w-full">
+                  <AccordionItem value={release.idRilis} className="border-b-0">
+                    <AccordionTrigger className="p-4 text-left hover:no-underline data-[state=open]:bg-muted/50 focus-visible:ring-1 focus-visible:ring-ring w-full">
+                      <div className="flex items-start gap-4 w-full">
+                        <div className="w-16 h-16 sm:w-20 sm:h-20 flex-shrink-0 relative">
+                          {release.coverArtUrl ? (
+                            <Image src={release.coverArtUrl} alt={release.judulRilisan} fill className="rounded-md object-cover" data-ai-hint="album cover" />
+                          ) : (
+                            <Image src="https://placehold.co/80x80.png" alt="Placeholder" fill className="rounded-md object-cover" data-ai-hint="album cover" />
+                          )}
+                        </div>
+                        <div className="flex-1 space-y-1 min-w-0">
+                          <p className="text-xs text-muted-foreground truncate" title={release.idRilis}>ID: {release.idRilis}</p>
+                          <h3 className="text-base sm:text-lg font-semibold leading-tight truncate" title={release.judulRilisan}>
+                            {release.judulRilisan}
+                          </h3>
+                          <p className="text-sm text-muted-foreground truncate" title={release.artist}>
+                            {release.artist}
+                          </p>
+                          <p className="text-sm mt-1">
+                            <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${getStatusColor(release.status)}`}>
+                              {release.status}
+                            </span>
+                          </p>
+                        </div>
+                      </div>
+                    </AccordionTrigger>
+                    <AccordionContent className="border-t">
+                      <div className="px-4 py-3 space-y-2 text-sm">
+                        {release.upc && <p><span className="font-medium text-foreground">UPC:</span> {release.upc}</p>}
+                        {release.isrc && <p><span className="font-medium text-foreground">ISRC:</span> {release.isrc}</p>}
+                        <p><span className="font-medium text-foreground">Tgl Tayang:</span> {format(new Date(release.tanggalTayang), "dd MMM yyyy")}</p>
+                        {release.audioFileName && (
+                          <p className="flex items-center text-muted-foreground text-xs truncate">
+                            <FileAudio className="mr-1.5 h-3 w-3 flex-shrink-0 text-foreground" />
+                            <span className="font-medium text-foreground mr-1">Audio:</span>
+                            <span className="truncate" title={release.audioFileName}>{release.audioFileName}</span>
+                          </p>
+                        )}
+                      </div>
+                    </AccordionContent>
+                  </AccordionItem>
+                </Accordion>
+                <div className="p-3 sm:p-4 border-t flex items-center justify-end gap-2 bg-muted/20">
+                  <Button variant="outline" size="sm" onClick={() => handleOpenEditDialog(release)} className="h-8 px-3 text-xs sm:text-sm">Edit</Button>
+                  <Button variant="destructive" size="sm" onClick={() => handleDeleteRelease(release.idRilis)} className="h-8 px-3">
+                    <Trash2 className="h-3 w-3 sm:h-4 sm:w-4" />
                   </Button>
-                </CardFooter>
+                </div>
               </Card>
             ))}
           </div>
@@ -248,5 +269,6 @@ export default function ReleasesPage() {
     </div>
   );
 }
+    
 
     
