@@ -4,7 +4,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { PlusCircle, Search, Trash2, Music, FileAudio } from 'lucide-react';
 import type { ReleaseEntry, ReleaseStatus } from '@/types';
@@ -14,7 +14,7 @@ import Link from 'next/link';
 import { format } from 'date-fns';
 import Image from 'next/image';
 
-const LOCAL_STORAGE_KEY = 'trackStackReleases'; // Keeping key for potential existing data
+const LOCAL_STORAGE_KEY = 'trackStackReleases';
 
 export default function ReleasesPage() {
   const [releases, setReleases] = useState<ReleaseEntry[]>([]);
@@ -58,7 +58,6 @@ export default function ReleasesPage() {
       const newRelease: ReleaseEntry = {
         ...data,
         idRilis: crypto.randomUUID(),
-        // coverArtUrl and audioFileName are already in data from form
       };
       setReleases(prevReleases => [newRelease, ...prevReleases]);
       toast({ title: "Rilisan Ditambahkan", description: `Rilisan "${data.judulRilisan}" telah berhasil ditambahkan.` });
@@ -91,13 +90,13 @@ export default function ReleasesPage() {
   const getStatusColor = (status: ReleaseStatus) => {
     switch (status) {
       case 'Upload':
-        return 'bg-blue-100 text-blue-700'; // Blue for Upload
+        return 'bg-blue-100 text-blue-700';
       case 'Pending':
-        return 'bg-yellow-100 text-yellow-700'; // Yellow for Pending
+        return 'bg-yellow-100 text-yellow-700';
       case 'Rilis':
-        return 'bg-green-100 text-green-700'; // Green for Rilis
+        return 'bg-green-100 text-green-700';
       case 'Takedown':
-        return 'bg-red-100 text-red-700'; // Red for Takedown
+        return 'bg-red-100 text-red-700';
       default:
         return 'bg-gray-100 text-gray-700';
     }
@@ -110,53 +109,29 @@ export default function ReleasesPage() {
           <Link href="/" className="text-3xl font-bold font-headline tracking-tight text-primary">
             VortexTunes Digital
           </Link>
-          <nav className="flex items-center gap-4">
-            <Link href="/" passHref>
-              <Button variant="outline" size="sm" className="border-primary text-primary">Manajemen Rilisan</Button>
-            </Link>
-          </nav>
+          <div className="flex items-center gap-4">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                type="search"
+                placeholder="Cari rilisan..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-10 w-full sm:w-64 h-9" // Adjusted height to match typical header inputs
+              />
+            </div>
+            <nav className="hidden sm:flex items-center"> {/* Hide on small screens if search takes too much space */}
+              <Link href="/" passHref>
+                <Button variant="outline" size="sm" className="border-primary text-primary">Manajemen Rilisan</Button>
+              </Link>
+            </nav>
+          </div>
         </div>
       </header>
 
       <main className="flex-grow container max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="flex flex-col sm:flex-row justify-between items-center mb-8 gap-4">
           <h2 className="text-2xl font-bold font-headline">Manajemen Rilisan</h2>
-          <div className="flex gap-2 w-full sm:w-auto">
-            <div className="relative flex-grow sm:flex-grow-0">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                type="search"
-                placeholder="Cari rilisan (judul, artis)..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10 w-full sm:w-64"
-              />
-            </div>
-            <Dialog open={isAddDialogOpen} onOpenChange={(open) => {
-              setIsAddDialogOpen(open);
-              if (!open) setEditingRelease(null);
-            }}>
-              <DialogTrigger asChild>
-                <Button onClick={handleOpenAddDialog}>
-                  <PlusCircle className="mr-2 h-5 w-5" />
-                  Tambah Rilisan
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
-                <DialogHeader>
-                  <DialogTitle>{editingRelease ? "Edit Rilisan" : "Tambah Rilisan Baru"}</DialogTitle>
-                </DialogHeader>
-                <ReleaseForm 
-                  onSubmit={handleAddRelease} 
-                  initialData={editingRelease || undefined} 
-                  onCancel={() => {
-                    setIsAddDialogOpen(false);
-                    setEditingRelease(null);
-                  }}
-                />
-              </DialogContent>
-            </Dialog>
-          </div>
         </div>
 
         {filteredReleases.length === 0 ? (
@@ -164,7 +139,7 @@ export default function ReleasesPage() {
             <Music className="mx-auto h-16 w-16 text-primary opacity-50 mb-4" />
             <h3 className="text-xl font-semibold mb-2">Tidak Ada Rilisan</h3>
             <p className="text-muted-foreground">
-              {searchTerm ? "Tidak ada rilisan yang cocok dengan pencarian Anda." : "Belum ada rilisan yang ditambahkan. Klik 'Tambah Rilisan' untuk memulai."}
+              {searchTerm ? "Tidak ada rilisan yang cocok dengan pencarian Anda." : "Belum ada rilisan yang ditambahkan. Klik tombol '+' untuk memulai."}
             </p>
           </div>
         ) : (
@@ -205,6 +180,36 @@ export default function ReleasesPage() {
           </div>
         )}
       </main>
+
+      <Dialog open={isAddDialogOpen} onOpenChange={(open) => {
+        setIsAddDialogOpen(open);
+        if (!open) setEditingRelease(null);
+      }}>
+        <DialogTrigger asChild>
+          <Button 
+            onClick={handleOpenAddDialog}
+            variant="default"
+            className="fixed bottom-6 right-6 z-50 h-14 w-14 rounded-full shadow-lg flex items-center justify-center p-0"
+            aria-label="Tambah Rilisan"
+          >
+            <PlusCircle className="h-7 w-7" />
+          </Button>
+        </DialogTrigger>
+        <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{editingRelease ? "Edit Rilisan" : "Tambah Rilisan Baru"}</DialogTitle>
+          </DialogHeader>
+          <ReleaseForm 
+            onSubmit={handleAddRelease} 
+            initialData={editingRelease || undefined} 
+            onCancel={() => {
+              setIsAddDialogOpen(false);
+              setEditingRelease(null);
+            }}
+          />
+        </DialogContent>
+      </Dialog>
+      
        <footer className="py-6 border-t">
         <div className="container max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 text-center text-xs text-muted-foreground">
           <p className="font-headline">&copy; {new Date().getFullYear()} VortexTunes Digital. All rights reserved.</p>
