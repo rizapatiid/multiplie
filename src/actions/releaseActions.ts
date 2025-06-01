@@ -20,6 +20,7 @@ function extractDriveIdFromUrl(url: string): string | null {
     /drive\.google\.com\/file\/d\/([a-zA-Z0-9_-]+)/, // /file/d/ID/...
     /drive\.google\.com\/open\?id=([a-zA-Z0-9_-]+)/, // /open?id=ID
     /drive\.google\.com\/uc\?id=([a-zA-Z0-9_-]+)/,   // /uc?id=ID (direct download)
+    /([a-zA-Z0-9_-]{25,})/, // Match a string that looks like a file ID (e.g., if just ID is pasted)
   ];
   for (const pattern of patterns) {
     const match = url.match(pattern);
@@ -29,8 +30,14 @@ function extractDriveIdFromUrl(url: string): string | null {
     }
   }
   // If no pattern matched but it's not a URL (could be a raw ID)
-  if (!id && !url.startsWith('http') && url.length > 20) { // Basic check for a potential ID string
+  if (!id && !url.startsWith('http') && url.length > 20 && !url.includes(" ")) { // Basic check for a potential ID string
+    console.log(`[extractDriveIdFromUrl] Input "${url}" treated as a raw ID.`);
     return url;
+  }
+  if (id) {
+    console.log(`[extractDriveIdFromUrl] Extracted ID "${id}" from URL "${url}".`);
+  } else {
+    console.log(`[extractDriveIdFromUrl] No ID extracted from URL "${url}".`);
   }
   return id;
 }
@@ -38,38 +45,53 @@ function extractDriveIdFromUrl(url: string): string | null {
 
 // Helper function to map spreadsheet rows to ReleaseEntry based on user's sheet structure
 function mapRowToReleaseEntry(row: any[], rowIndex: number): ReleaseEntry | null {
+  console.log(`[mapRowToReleaseEntry] Processing spreadsheet row index ${rowIndex + 2}, data:`, JSON.stringify(row));
   try {
     // User's Spreadsheet Structure:
     // A (idx 0): ID RILIS
     // B (idx 1): Timestamp (ignored by app for now)
     // C (idx 2): JUDUL RILISAN
     // D (idx 3): ARTIS
-    // E (idx 4): GAMBAR RILISAN (URL)
-    // F (idx 5): FILE AUDIO (URL)
+    // E (idx 4): GAMBAR RILISAN (URL/ID)
+    // F (idx 5): FILE AUDIO (URL/ID)
     // G (idx 6): UPC CODE
     // H (idx 7): ISRC CODE
     // I (idx 8): TANGGAL TAYANG (text, needs parsing)
     // J (idx 9): STATUS
 
-    const idRilis = row[0] || `auto-${Date.now()}-${rowIndex}`; // ID RILIS from Column A
+    const idRilis = row[0] || `auto-gen-${Date.now()}-${rowIndex}`; // ID RILIS from Column A
 
     // Skip if essential fields like ID Rilis or Judul Rilisan are missing
     if (!row[0] && !row[2]) {
-      console.warn(`[mapRowToReleaseEntry] Skipping empty or incomplete row at spreadsheet index ${rowIndex + 2}. Lacking ID Rilis (Col A) and Judul Rilisan (Col C). Row data:`, row);
+      console.warn(`[mapRowToReleaseEntry] SKIPPING row at spreadsheet index ${rowIndex + 2}. Lacking ID Rilis (Col A) AND Judul Rilisan (Col C). Row data:`, row);
       return null;
+    }
+     if (!row[0]) {
+      console.warn(`[mapRowToReleaseEntry] Row at spreadsheet index ${rowIndex + 2} is missing ID Rilis (Col A). Using auto-generated ID: ${idRilis}. Row data:`, row);
+    }
+    if (!row[2]) {
+      console.warn(`[mapRowToReleaseEntry] Row at spreadsheet index ${rowIndex + 2} is missing Judul Rilisan (Col C). Using "Tanpa Judul". Row data:`, row);
     }
     
     let tanggalTayang;
     const dateString = row[8]; // TANGGAL TAYANG from Column I
     if (dateString) {
-      // Try to parse common date formats, including "dd MMMM yyyy" (e.g., "11 April 2025")
-      // and ISO "yyyy-MM-dd"
       let parsedDate = parseISO(dateString); // Handles "yyyy-MM-dd"
       if (!isValid(parsedDate)) {
-         // Attempt to parse "dd MonthName yyyy" manually if needed or rely on a more robust parser
-         // For now, we'll log a warning and use current date as fallback for unparseable non-ISO dates
-         console.warn(`[mapRowToReleaseEntry] Invalid or non-ISO date format in row ${rowIndex + 2}, column I: "${dateString}". Using current date as fallback.`);
-         parsedDate = new Date();
+         // Attempt to parse "dd MonthName yyyy" - this part is tricky with date-fns without more specific locale/format knowledge
+         // For now, log and fallback. A more robust solution might involve a date parsing library with format guessing or specific format.
+         console.warn(`[mapRowToReleaseEntry] Invalid or non-ISO date format in row ${rowIndex + 2}, column I: "${dateString}". Trying to parse common formats. Original: ${dateString}`);
+         // Example: new Date(dateString) can sometimes work for simple formats, but is unreliable.
+         // We'll stick to parseISO for consistency and log if it fails.
+         // If your dates are "11 April 2025", you'll need a custom parser or ensure they are "yyyy-MM-dd".
+         // For now, if parseISO fails, let's try a direct Date constructor as a last resort, but be wary.
+         parsedDate = new Date(dateString);
+         if (!isValid(parsedDate)) {
+            console.error(`[mapRowToReleaseEntry] CRITICAL: Could not parse date "${dateString}" for row ${rowIndex + 2}. Using current date as fallback.`);
+            parsedDate = new Date();
+         } else {
+            console.log(`[mapRowToReleaseEntry] Successfully parsed date "${dateString}" using new Date() for row ${rowIndex + 2}.`);
+         }
       }
       tanggalTayang = parsedDate;
     } else {
@@ -83,7 +105,7 @@ function mapRowToReleaseEntry(row: any[], rowIndex: number): ReleaseEntry | null
     const audioLinkOrId = row[5]; // FILE AUDIO from Column F
     const audioFileId = extractDriveIdFromUrl(audioLinkOrId);
 
-    return {
+    const releaseEntry: ReleaseEntry = {
       idRilis: idRilis,
       judulRilisan: row[2] || 'Tanpa Judul', // JUDUL RILISAN from Column C
       artist: row[3] || 'Tanpa Artis',     // ARTIS from Column D
@@ -94,8 +116,11 @@ function mapRowToReleaseEntry(row: any[], rowIndex: number): ReleaseEntry | null
       coverArtUrl: coverArtFileId ? `https://drive.google.com/uc?id=${coverArtFileId}` : undefined,
       audioFileName: audioFileId ? `File ID: ${audioFileId}` : undefined, // Or construct a view/download link
     };
+    console.log(`[mapRowToReleaseEntry] Successfully mapped row ${rowIndex + 2} to entry:`, JSON.stringify(releaseEntry));
+    return releaseEntry;
+
   } catch (error: any) {
-    console.error(`[mapRowToReleaseEntry] Error mapping row at spreadsheet index ${rowIndex + 2}:`, error.message, 'Row data:', row);
+    console.error(`🔴 [mapRowToReleaseEntry] CRITICAL ERROR mapping row at spreadsheet index ${rowIndex + 2}:`, error.message, 'Row data:', JSON.stringify(row), 'Stack:', error.stack);
     return null; // Skip this row if there's a critical error mapping it
   }
 }
@@ -106,7 +131,8 @@ export async function getReleases(): Promise<ReleaseEntry[]> {
   if (!SPREADSHEET_ID) {
     const errorMessage = "🔴 FATAL: GOOGLE_SPREADSHEET_ID is not configured in your .env.local file. Please ensure it is set correctly (e.g., GOOGLE_SPREADSHEET_ID=\"your_sheet_id\") and restart your server.";
     console.error(errorMessage);
-    throw new Error(errorMessage);
+    // throw new Error(errorMessage); // Throwing here stops the app, let's return empty for now so UI can show error
+    return Promise.reject(new Error(errorMessage));
   }
   console.log(`📄 [getReleases] Using SPREADSHEET_ID: ${SPREADSHEET_ID} and SHEET_NAME: ${SHEET_NAME}`);
 
@@ -132,34 +158,40 @@ export async function getReleases(): Promise<ReleaseEntry[]> {
       
       console.log(`ℹ️ [getReleases] Mapped ${mappedReleases.length} valid release entries.`);
       if (mappedReleases.length === 0 && rows.length > 0) {
-        console.warn(`⚠️ [getReleases] All ${rows.length} rows from sheet were filtered out or invalid after mapping. Check mapping logic and sheet data.`);
+        console.warn(`⚠️ [getReleases] All ${rows.length} rows from sheet were filtered out or invalid after mapping. Check mapping logic and sheet data. Ensure 'ID RILIS' and 'JUDUL RILISAN' are present or mapping logic can handle their absence.`);
       }
       return mappedReleases;
     } else if (rows && rows.length === 0) {
-      console.log(`ℹ️ [getReleases] No data rows found in the specified range (${range}). The sheet might be empty after the header row.`);
+      console.log(`ℹ️ [getReleases] No data rows found in the specified range (${range}). The sheet might be empty after the header row, or the range is incorrect for data.`);
       return [];
     } else {
-      console.log(`🤔 [getReleases] 'response.data.values' is null or undefined. The sheet might be completely empty or the range is incorrect for SPREADSHEET_ID: ${SPREADSHEET_ID}.`);
+      console.log(`🤔 [getReleases] 'response.data.values' is null or undefined. The sheet might be completely empty, or the range is incorrect, or there was an issue with the API call that didn't throw an error but returned no values for SPREADSHEET_ID: ${SPREADSHEET_ID}. Response status: ${response.status}, Response data: ${JSON.stringify(response.data)}`);
       return [];
     }
   } catch (error: any) {
-    console.error('🔴 [getReleases] Error fetching releases from Google Sheets:');
+    console.error('🔴 [getReleases] CRITICAL ERROR fetching releases from Google Sheets:');
     console.error('Error Type:', error.constructor.name);
     console.error('Error Message:', error.message);
     if (error.response && error.response.data && error.response.data.error) {
       console.error('Google API Error Details:', JSON.stringify(error.response.data.error, null, 2));
       const apiError = error.response.data.error;
+      let specificMessage = `Google API Error: ${apiError.message} (Code: ${apiError.code})`;
       if (apiError.code === 403) {
-        console.error("🚫 [getReleases] Permission Denied (403). Check if the Google Sheets API is enabled, OAuth consent screen has correct scopes (spreadsheets.readonly or spreadsheets), and the authenticated user has read access to the spreadsheet.");
+        specificMessage = "🚫 Permission Denied (403). Check if Google Sheets API is enabled, OAuth consent screen has correct scopes (spreadsheets.readonly or spreadsheets), and the authenticated user has read access to the spreadsheet.";
+        console.error(specificMessage);
       } else if (apiError.code === 401) {
-        console.error("🔑 [getReleases] Authentication Issue (401). OAuth token might be missing, invalid, or expired. Ensure `getAuthenticatedClient` in `src/lib/google-clients.ts` is correctly implemented and provides valid tokens.");
+        specificMessage = "🔑 Authentication Issue (401). OAuth token might be missing, invalid, or expired. Ensure `getAuthenticatedClient` in `src/lib/google-clients.ts` is correctly implemented and provides valid tokens.";
+        console.error(specificMessage);
       }  else if (apiError.code === 404) {
-        console.error(`❓ [getReleases] Spreadsheet Not Found (404). Ensure SPREADSHEET_ID "${SPREADSHEET_ID}" is correct and the sheet named "${SHEET_NAME}" exists.`);
+        specificMessage = `❓ Spreadsheet Not Found (404). Ensure SPREADSHEET_ID "${SPREADSHEET_ID}" is correct and the sheet named "${SHEET_NAME}" exists.`;
+        console.error(specificMessage);
       }
+      return Promise.reject(new Error(specificMessage));
     } else {
       console.error('Error Stack:', error.stack);
     }
-    return []; 
+    // return []; // Return empty array on error to prevent UI crash, error will be handled by calling function
+    return Promise.reject(new Error(error.message || "Unknown error fetching releases."));
   }
 }
 
@@ -168,7 +200,8 @@ export async function getReleaseById(idRilis: string): Promise<ReleaseEntry | nu
   if (!SPREADSHEET_ID) {
      const errorMessage = "🔴 FATAL: GOOGLE_SPREADSHEET_ID is not configured in your .env.local file. Please ensure it is set correctly and restart your server.";
     console.error(errorMessage);
-    throw new Error(errorMessage);
+    // throw new Error(errorMessage);
+    return Promise.reject(new Error(errorMessage));
   }
   try {
     const releases = await getReleases(); 
@@ -182,7 +215,8 @@ export async function getReleaseById(idRilis: string): Promise<ReleaseEntry | nu
   } catch (error: any) {
     console.error(`🔴 [getReleaseById] Error fetching release by ID ${idRilis}:`);
     console.error('Error message:', error.message);
-    return null;
+    // return null;
+    return Promise.reject(new Error(error.message || `Error fetching release by ID ${idRilis}`));
   }
 }
 
@@ -191,7 +225,8 @@ async function uploadFileToDrive(file: File, fileName: string): Promise<string |
   if (!DRIVE_FOLDER_ID) {
      const errorMessage = "🔴 FATAL: GOOGLE_DRIVE_FOLDER_ID is not configured in your .env.local file for file uploads. Please ensure it is set correctly and restart your server.";
     console.error(errorMessage);
-    throw new Error(errorMessage);
+    // throw new Error(errorMessage);
+    return Promise.reject(new Error(errorMessage));
   }
   try {
     const drive = await getDriveClient();
@@ -221,20 +256,25 @@ async function uploadFileToDrive(file: File, fileName: string): Promise<string |
   } catch (error: any) {
     console.error(`🔴 [uploadFileToDrive] Error uploading file "${fileName}" to Google Drive:`);
     console.error('Error Message:', error.message);
+    let specificMessage = error.message || `Error uploading ${fileName} to Drive.`;
     if (error.response && error.response.data && error.response.data.error) {
       console.error('Google API Error Details for Drive Upload:', JSON.stringify(error.response.data.error, null, 2));
        const apiError = error.response.data.error;
       if (apiError.code === 403) {
-        console.error("🚫 [uploadFileToDrive] Permission Denied (403). Check if the Google Drive API is enabled, OAuth consent screen has correct scopes (drive.file or drive), and the authenticated user has write access to the target folder ID:", DRIVE_FOLDER_ID);
+        specificMessage = `🚫 Permission Denied (403) for Drive upload. Check API scopes (drive.file or drive) and folder permissions for ${DRIVE_FOLDER_ID}.`;
+        console.error(specificMessage);
       } else if (apiError.code === 401) {
-         console.error("🔑 [uploadFileToDrive] Authentication Issue (401). OAuth token might be missing, invalid, or expired.");
+         specificMessage = "🔑 Authentication Issue (401) for Drive upload. OAuth token might be invalid.";
+         console.error(specificMessage);
       } else if (apiError.code === 404) {
-         console.error(`❓ [uploadFileToDrive] Folder Not Found (404). Ensure DRIVE_FOLDER_ID "${DRIVE_FOLDER_ID}" is correct and accessible.`);
+         specificMessage = `❓ Drive Folder Not Found (404). Ensure DRIVE_FOLDER_ID "${DRIVE_FOLDER_ID}" is correct and accessible.`;
+         console.error(specificMessage);
       }
     } else {
        console.error('Error Stack:', error.stack);
     }
-    return null;
+    // return null;
+    return Promise.reject(new Error(specificMessage));
   }
 }
 
@@ -264,23 +304,23 @@ export async function addRelease(formData: FormData): Promise<ReleaseEntry | { e
     if (coverArtFile && coverArtFile.size > 0) {
       console.log(`🖼️ [addRelease] Cover art file present: ${coverArtFile.name}, size: ${coverArtFile.size}`);
       coverArtFileId = await uploadFileToDrive(coverArtFile, `cover_${Date.now()}_${coverArtFile.name}`);
-      if (!coverArtFileId) return { error: "Gagal mengupload gambar sampul ke Google Drive." };
+      if (!coverArtFileId) return { error: "Gagal mengupload gambar sampul ke Google Drive. Periksa log server untuk detail." };
     }
     if (audioFile && audioFile.size > 0) {
       console.log(`🎵 [addRelease] Audio file present: ${audioFile.name}, size: ${audioFile.size}`);
       audioFileId = await uploadFileToDrive(audioFile, `audio_${Date.now()}_${audioFile.name}`);
-      if (!audioFileId) return { error: "Gagal mengupload file audio ke Google Drive." };
+      if (!audioFileId) return { error: "Gagal mengupload file audio ke Google Drive. Periksa log server untuk detail." };
     }
   } catch (e: any) {
     console.error("🔴 [addRelease] Error during file upload to Drive:", e);
-    return { error: `Gagal mengupload file: ${e.message}` };
+    return { error: `Gagal mengupload file: ${e.message}. Periksa log server.` };
   }
 
   const newIdRilis = `VT-${Date.now().toString(36)}-${Math.random().toString(36).substring(2, 7)}`;
   console.log(`🆔 [addRelease] Generated new release ID: ${newIdRilis}`);
   
   const releaseDataForSheet = {
-    idRilis: newIdRilis,
+    idRilis: newIdRilis, // Column A
     timestamp: new Date().toISOString(), // Column B: Timestamp
     judulRilisan: rawData.judulRilisan as string, // Column C
     artist: rawData.artist as string, // Column D
@@ -293,16 +333,16 @@ export async function addRelease(formData: FormData): Promise<ReleaseEntry | { e
   };
   
   const valuesToAppend = [
-    releaseDataForSheet.idRilis,
-    releaseDataForSheet.timestamp,
-    releaseDataForSheet.judulRilisan,
-    releaseDataForSheet.artist,
-    releaseDataForSheet.coverArtFinalId,
-    releaseDataForSheet.audioFinalId,
-    releaseDataForSheet.upc || '',
-    releaseDataForSheet.isrc || '',
-    format(releaseDataForSheet.tanggalTayang, 'yyyy-MM-dd'),
-    releaseDataForSheet.status,
+    releaseDataForSheet.idRilis,             // A
+    releaseDataForSheet.timestamp,           // B
+    releaseDataForSheet.judulRilisan,        // C
+    releaseDataForSheet.artist,              // D
+    releaseDataForSheet.coverArtFinalId,     // E
+    releaseDataForSheet.audioFinalId,        // F
+    releaseDataForSheet.upc || '',           // G
+    releaseDataForSheet.isrc || '',          // H
+    format(releaseDataForSheet.tanggalTayang, 'yyyy-MM-dd'), // I (Pastikan format tanggal sesuai untuk Sheets)
+    releaseDataForSheet.status,              // J
   ];
 
   try {
@@ -310,8 +350,8 @@ export async function addRelease(formData: FormData): Promise<ReleaseEntry | { e
     console.log(`➕ [addRelease] Appending new release to Google Sheets (Range: ${SHEET_NAME}!A:J):`, valuesToAppend);
     await sheets.spreadsheets.values.append({
       spreadsheetId: SPREADSHEET_ID,
-      range: `${SHEET_NAME}!A:J`, // Append to all columns A-J
-      valueInputOption: 'USER_ENTERED',
+      range: `${SHEET_NAME}!A:J`, // Append to all columns A-J, sheets API will find the first empty row
+      valueInputOption: 'USER_ENTERED', // Or 'RAW' if you don't want Sheets to parse dates etc.
       requestBody: {
         values: [valuesToAppend],
       },
@@ -333,10 +373,12 @@ export async function addRelease(formData: FormData): Promise<ReleaseEntry | { e
   } catch (error: any) {
     console.error('🔴 [addRelease] Error adding release to Google Sheets:');
     console.error('Error Message:', error.message);
+    let specificError = `Gagal menambahkan rilisan ke Google Sheets: ${error.message || 'Unknown error'}`;
     if (error.response && error.response.data && error.response.data.error) {
       console.error('Google API Error Details for Sheets Append:', JSON.stringify(error.response.data.error, null, 2));
+      specificError = `Gagal menambahkan rilisan ke Sheets: ${error.response.data.error.message} (Code: ${error.response.data.error.code}). Periksa log server.`;
     }
-    return { error: `Gagal menambahkan rilisan ke Google Sheets: ${error.message || 'Unknown error'}` };
+    return { error: specificError };
   }
 }
 
@@ -354,30 +396,31 @@ export async function updateRelease(idRilis: string, formData: FormData): Promis
   }
   
   const sheets = await getSheetsClient();
-  let rowIndexToUpdate = -1;
-  let existingRowData: any[] = []; // To get existing file IDs if not re-uploaded
+  let rowIndexToUpdate = -1; // 0-based index relative to the start of the data range (A2)
+  let existingRowData: any[] = []; 
 
   try {
-    console.log(`🔍 [updateRelease] Fetching all rows to find row for ID ${idRilis} (in Column A) for update...`);
+    console.log(`🔍 [updateRelease] Fetching all rows from range ${SHEET_NAME}!A2:J to find row for ID ${idRilis} (in Column A) for update...`);
     const getResponse = await sheets.spreadsheets.values.get({
         spreadsheetId: SPREADSHEET_ID,
-        range: `${SHEET_NAME}!A2:J`, // Read up to column J
+        range: `${SHEET_NAME}!A2:J`, // Read all data columns
     });
     const rows = getResponse.data.values;
-    if (rows) {
-        rowIndexToUpdate = rows.findIndex(row => row[0] === idRilis); // ID RILIS is in Column A (index 0)
+    if (rows && rows.length > 0) {
+        rowIndexToUpdate = rows.findIndex(row => row && row[0] === idRilis); // ID RILIS is in Column A (index 0)
         if (rowIndexToUpdate !== -1) {
           existingRowData = rows[rowIndexToUpdate];
-          console.log(`[updateRelease] Found existing data for ID ${idRilis} at row index ${rowIndexToUpdate} (0-based from A2):`, existingRowData);
+          console.log(`[updateRelease] Found existing data for ID ${idRilis} at data index ${rowIndexToUpdate} (0-based from A2):`, existingRowData);
         } else {
-          console.error(`[updateRelease] ID ${idRilis} not found in column A of the sheet.`);
+          console.error(`[updateRelease] ID ${idRilis} not found in column A of the sheet range ${SHEET_NAME}!A2:J.`);
         }
     } else {
-      console.warn(`[updateRelease] No rows returned from sheet when searching for ID ${idRilis}.`);
+      console.warn(`[updateRelease] No rows returned from sheet range ${SHEET_NAME}!A2:J when searching for ID ${idRilis}. Sheet might be empty or range issue.`);
     }
   } catch (e: any) {
       console.error('🔴 [updateRelease] Error fetching rows for update:', e.message);
-      return { error: `Gagal mengambil data untuk update: ${e.message}` };
+      // If we can't fetch, we can't update.
+      return { error: `Gagal mengambil data untuk update: ${e.message}. Periksa log server.` };
   }
 
   if (rowIndexToUpdate === -1) {
@@ -385,8 +428,8 @@ export async function updateRelease(idRilis: string, formData: FormData): Promis
     console.error(errorMsg);
     return { error: errorMsg };
   }
-  const actualRowNumber = rowIndexToUpdate + 2; // Spreadsheet row number (1-based)
-  console.log(`ℹ️ [updateRelease] Found release to update at sheet row ${actualRowNumber}.`);
+  const actualSheetRowNumber = rowIndexToUpdate + 2; // Spreadsheet row number is 1-based, and data starts from row 2.
+  console.log(`ℹ️ [updateRelease] Found release to update at sheet row ${actualSheetRowNumber}.`);
 
   const rawData = Object.fromEntries(formData.entries());
   console.log("📝 [updateRelease] Raw form data for update:", rawData);
@@ -402,25 +445,27 @@ export async function updateRelease(idRilis: string, formData: FormData): Promis
   try {
     if (coverArtFile && coverArtFile.size > 0) {
       console.log(`🖼️ [updateRelease] New cover art file provided: ${coverArtFile.name}. Uploading...`);
+      // TODO: Potentially delete old file from Drive if replacing
       coverArtFinalId = await uploadFileToDrive(coverArtFile, `cover_${Date.now()}_${coverArtFile.name}`);
-      if (!coverArtFinalId) return { error: "Gagal mengupload gambar sampul baru ke Google Drive." };
+      if (!coverArtFinalId) return { error: "Gagal mengupload gambar sampul baru ke Google Drive. Periksa log server." };
     } else {
       console.log("ℹ️ [updateRelease] No new cover art file for update. Using existing ID if available:", coverArtFinalId);
     }
     if (audioFile && audioFile.size > 0) {
       console.log(`🎵 [updateRelease] New audio file provided: ${audioFile.name}. Uploading...`);
+      // TODO: Potentially delete old file from Drive if replacing
       audioFinalId = await uploadFileToDrive(audioFile, `audio_${Date.now()}_${audioFile.name}`);
-       if (!audioFinalId) return { error: "Gagal mengupload file audio baru ke Google Drive." };
+       if (!audioFinalId) return { error: "Gagal mengupload file audio baru ke Google Drive. Periksa log server." };
     } else {
       console.log("ℹ️ [updateRelease] No new audio file for update. Using existing ID if available:", audioFinalId);
     }
   } catch (e: any) {
     console.error("🔴 [updateRelease] Error during file upload to Drive for update:", e);
-    return { error: `Gagal mengupload file saat update: ${e.message}` };
+    return { error: `Gagal mengupload file saat update: ${e.message}. Periksa log server.` };
   }
   
   const updatedReleaseData = {
-    idRilis: idRilis, // Column A (already exists)
+    idRilis: idRilis, // Column A (already exists, do not change ID)
     timestamp: existingRowData[1] || new Date().toISOString(), // Column B: Keep existing or update, for now keep existing if available
     judulRilisan: rawData.judulRilisan as string, // Column C
     artist: rawData.artist as string, // Column D
@@ -432,24 +477,26 @@ export async function updateRelease(idRilis: string, formData: FormData): Promis
     status: rawData.status as ReleaseFormValues['status'], // Column J
   };
 
+  // Ensure the order matches the columns A-J in your sheet
   const valuesToUpdate = [
-    updatedReleaseData.idRilis, // A
-    updatedReleaseData.timestamp, // B
-    updatedReleaseData.judulRilisan, // C
-    updatedReleaseData.artist, // D
-    updatedReleaseData.coverArtIdToStore, // E
-    updatedReleaseData.audioIdToStore, // F
-    updatedReleaseData.upc || '', // G
-    updatedReleaseData.isrc || '', // H
-    format(updatedReleaseData.tanggalTayang, 'yyyy-MM-dd'), // I
-    updatedReleaseData.status, // J
+    updatedReleaseData.idRilis,                              // A
+    updatedReleaseData.timestamp,                            // B
+    updatedReleaseData.judulRilisan,                         // C
+    updatedReleaseData.artist,                               // D
+    updatedReleaseData.coverArtIdToStore,                    // E
+    updatedReleaseData.audioIdToStore,                       // F
+    updatedReleaseData.upc || '',                            // G
+    updatedReleaseData.isrc || '',                           // H
+    format(updatedReleaseData.tanggalTayang, 'yyyy-MM-dd'),  // I
+    updatedReleaseData.status,                               // J
   ];
 
   try {
-    console.log(`💾 [updateRelease] Updating row ${actualRowNumber} in Google Sheets (Range: ${SHEET_NAME}!A${actualRowNumber}:J${actualRowNumber}) with values:`, valuesToUpdate);
+    const updateRange = `${SHEET_NAME}!A${actualSheetRowNumber}:J${actualSheetRowNumber}`;
+    console.log(`💾 [updateRelease] Updating row ${actualSheetRowNumber} in Google Sheets (Range: ${updateRange}) with values:`, valuesToUpdate);
     await sheets.spreadsheets.values.update({
       spreadsheetId: SPREADSHEET_ID,
-      range: `${SHEET_NAME}!A${actualRowNumber}:J${actualRowNumber}`,
+      range: updateRange,
       valueInputOption: 'USER_ENTERED',
       requestBody: {
         values: [valuesToUpdate],
@@ -474,10 +521,12 @@ export async function updateRelease(idRilis: string, formData: FormData): Promis
   } catch (error: any) {
     console.error(`🔴 [updateRelease] Error updating release ID ${idRilis} in Google Sheets:`);
      console.error('Error message:', error.message);
+    let specificError = `Gagal memperbarui rilisan di Google Sheets: ${error.message || 'Unknown error'}`;
     if (error.response && error.response.data && error.response.data.error) {
       console.error('Google API Error Details for Sheets Update:', JSON.stringify(error.response.data.error, null, 2));
+      specificError = `Gagal memperbarui rilisan di Sheets: ${error.response.data.error.message} (Code: ${error.response.data.error.code}). Periksa log server.`;
     }
-    return { error: `Gagal memperbarui rilisan di Google Sheets: ${error.message || 'Unknown error'}` };
+    return { error: specificError };
   }
 }
 
@@ -490,30 +539,29 @@ export async function deleteRelease(idRilis: string): Promise<{ success: boolean
   }
   
   const sheets = await getSheetsClient();
-  let rowIndexToDelete = -1;
-  let sheetIdForDeletion: number | null | undefined = null;
+  let rowIndexToDelete = -1; // 0-based index relative to the start of the data range (A2)
+  let sheetIdForDeletionApi: number | null | undefined = null;
 
   try {
-    console.log(`🔍 [deleteRelease] Fetching all rows to find row for ID ${idRilis} (in Column A) for deletion...`);
+    console.log(`🔍 [deleteRelease] Fetching all rows from range ${SHEET_NAME}!A2:J to find row for ID ${idRilis} (in Column A) for deletion...`);
     const getResponse = await sheets.spreadsheets.values.get({
         spreadsheetId: SPREADSHEET_ID,
-        range: `${SHEET_NAME}!A2:J`, // Read up to column J
+        range: `${SHEET_NAME}!A2:J`, // Read all data columns
     });
     const rows = getResponse.data.values;
-    if (rows) {
-        // ID RILIS is in Column A (index 0)
-        rowIndexToDelete = rows.findIndex(row => row[0] === idRilis); 
+    if (rows && rows.length > 0) {
+        rowIndexToDelete = rows.findIndex(row => row && row[0] === idRilis); 
         if (rowIndexToDelete !== -1) {
-           console.log(`[deleteRelease] Found row to delete for ID ${idRilis} at spreadsheet data index ${rowIndexToDelete} (0-based from A2).`);
+           console.log(`[deleteRelease] Found row to delete for ID ${idRilis} at data index ${rowIndexToDelete} (0-based from A2).`);
         } else {
-          console.warn(`[deleteRelease] ID ${idRilis} not found in column A of the sheet for deletion.`);
+          console.warn(`[deleteRelease] ID ${idRilis} not found in column A of the sheet range ${SHEET_NAME}!A2:J for deletion.`);
         }
     } else {
-      console.warn(`[deleteRelease] No rows returned from sheet when searching for ID ${idRilis} for deletion.`);
+      console.warn(`[deleteRelease] No rows returned from sheet range ${SHEET_NAME}!A2:J when searching for ID ${idRilis} for deletion.`);
     }
   } catch (e: any) {
       console.error('🔴 [deleteRelease] Error fetching rows for deletion:', e.message);
-      return { success: false, error: `Gagal mengambil data untuk penghapusan: ${e.message}` };
+      return { success: false, error: `Gagal mengambil data untuk penghapusan: ${e.message}. Periksa log server.` };
   }
 
   if (rowIndexToDelete === -1) {
@@ -521,25 +569,26 @@ export async function deleteRelease(idRilis: string): Promise<{ success: boolean
     console.error(errorMsg);
     return { success: false, error: errorMsg };
   }
-  // rowIndexToDelete is 0-based index of the data rows (starting from A2).
-  // actualRowNumberInSheet is 1-based, where row 1 is the header. So, data starts at row 2.
-  const actualRowNumberInSheet = rowIndexToDelete + 2; 
-  // The API's startIndex for deleteDimension is 0-based for the entire sheet.
-  const zeroBasedSheetIndexForDeletion = actualRowNumberInSheet - 1; 
-  console.log(`ℹ️ [deleteRelease] Release to delete is at sheet row ${actualRowNumberInSheet} (0-based sheet index ${zeroBasedSheetIndexForDeletion}).`);
+  
+  // The API's `deleteDimension` `startIndex` is 0-based for the *entire sheet*.
+  // `rowIndexToDelete` is 0-based *relative to the data starting at row 2*.
+  // So, the actual sheet row number to delete is `rowIndexToDelete + 2`.
+  // The 0-based sheet index for deletion is `(rowIndexToDelete + 2) - 1 = rowIndexToDelete + 1`.
+  const zeroBasedSheetIndexForDeletion = rowIndexToDelete + 1; 
+  console.log(`ℹ️ [deleteRelease] Release to delete is at data index ${rowIndexToDelete}, which corresponds to 0-based sheet index ${zeroBasedSheetIndexForDeletion}.`);
 
   try {
-    // Get the sheetId (gid) of the target sheet
+    // Get the sheetId (gid) of the target sheet by its name
     const spreadsheetInfo = await sheets.spreadsheets.get({ spreadsheetId: SPREADSHEET_ID });
     const sheet = spreadsheetInfo.data.sheets?.find(s => s.properties?.title === SHEET_NAME);
-    sheetIdForDeletion = sheet?.properties?.sheetId;
+    sheetIdForDeletionApi = sheet?.properties?.sheetId;
 
-    if (typeof sheetIdForDeletion !== 'number') { 
+    if (typeof sheetIdForDeletionApi !== 'number') { 
         const errorMsg = `Sheet dengan nama "${SHEET_NAME}" tidak ditemukan atau tidak memiliki sheetId di spreadsheet. Spreadsheet sheets: ${JSON.stringify(spreadsheetInfo.data.sheets?.map(s => s.properties?.title))}`;
         console.error(errorMsg);
         return { success: false, error: errorMsg };
     }
-    console.log(`🛡️ [deleteRelease] Sheet ID (gid) for "${SHEET_NAME}" is ${sheetIdForDeletion}. Proceeding with deletion.`);
+    console.log(`🛡️ [deleteRelease] Sheet ID (gid) for "${SHEET_NAME}" is ${sheetIdForDeletionApi}. Proceeding with deletion of row index ${zeroBasedSheetIndexForDeletion}.`);
 
     await sheets.spreadsheets.batchUpdate({
       spreadsheetId: SPREADSHEET_ID,
@@ -548,7 +597,7 @@ export async function deleteRelease(idRilis: string): Promise<{ success: boolean
           {
             deleteDimension: {
               range: {
-                sheetId: sheetIdForDeletion,
+                sheetId: sheetIdForDeletionApi,
                 dimension: 'ROWS',
                 startIndex: zeroBasedSheetIndexForDeletion, 
                 endIndex: zeroBasedSheetIndexForDeletion + 1, // Delete one row
@@ -558,17 +607,17 @@ export async function deleteRelease(idRilis: string): Promise<{ success: boolean
         ],
       },
     });
-    console.log(`✅ [deleteRelease] Release with ID ${idRilis} (row ${actualRowNumberInSheet}) deleted from Google Sheets successfully.`);
+    console.log(`✅ [deleteRelease] Release with ID ${idRilis} (row index ${zeroBasedSheetIndexForDeletion}) deleted from Google Sheets successfully.`);
     revalidatePath('/');
     return { success: true };
-  } catch (error: any)
-{
+  } catch (error: any) {
     console.error(`🔴 [deleteRelease] Error deleting release ID ${idRilis} from Google Sheets:`);
     console.error('Error Message:', error.message);
+    let specificError = `Gagal menghapus rilisan dari Google Sheets: ${error.message || 'Unknown error'}`;
     if (error.response && error.response.data && error.response.data.error) {
       console.error('Google API Error Details for Sheets Batch Update (Delete):', JSON.stringify(error.response.data.error, null, 2));
+      specificError = `Gagal menghapus rilisan dari Sheets: ${error.response.data.error.message} (Code: ${error.response.data.error.code}). Periksa log server.`;
     }
-    return { success: false, error: `Gagal menghapus rilisan dari Google Sheets: ${error.message || 'Unknown error'}` };
+    return { success: false, error: specificError };
   }
 }
-
