@@ -15,9 +15,9 @@ async function getAuthenticatedClient(): Promise<OAuth2Client> {
   const redirectUri = `${process.env.NEXT_PUBLIC_APP_URL}/api/auth/callback/google`; 
 
   if (!clientId || !clientSecret) {
-    const errorMsg = "🔴 FATAL: GOOGLE_CLIENT_ID or GOOGLE_CLIENT_SECRET is missing. Check .env.local and restart server.";
+    const errorMsg = "🔴 FATAL: GOOGLE_CLIENT_ID or GOOGLE_CLIENT_SECRET is missing. Check .env.local and restart server. API calls will fail.";
     console.error(errorMsg);
-    // Tidak melempar error di sini agar panggilan API yang sebenarnya yang gagal dan ditangkap oleh UI
+    // Tetap lanjutkan agar error sebenarnya (token tidak ada) muncul saat panggilan API
   }
   
   if (!process.env.NEXT_PUBLIC_APP_URL) {
@@ -29,58 +29,50 @@ async function getAuthenticatedClient(): Promise<OAuth2Client> {
   //---------------------------------------------------------------------------
   // !!! KRITIKAL: IMPLEMENTASI LOGIKA OTENTIKASI (PENGAMBILAN TOKEN) DI SINI !!!
   //---------------------------------------------------------------------------
-  // Bagian ini adalah yang PALING PENTING dan perlu Anda implementasikan.
-  // Anda perlu cara untuk mendapatkan access_token (dan idealnya refresh_token)
-  // setelah pengguna login dan memberikan izin.
+  // Anda PERLU mendapatkan access_token (dan idealnya refresh_token) dari pengguna
+  // yang sudah login dan memberikan izin, lalu mengaturnya di oauth2Client.
   //
   // **Jika menggunakan `next-auth` (SANGAT DISARANKAN):**
-  // 1. Pastikan `next-auth` sudah terinstall (`npm install next-auth`).
-  // 2. Konfigurasikan Google Provider di `src/app/api/auth/[...nextauth]/route.ts` (atau .js).
-  //    Gunakan `GOOGLE_CLIENT_ID` dan `GOOGLE_CLIENT_SECRET` Anda.
-  // 3. Dalam callback JWT dan session di `next-auth`, pastikan `accessToken` dan `refreshToken`
-  //    disimpan dan tersedia di objek `session`.
-  // 4. Di sini, Anda akan menggunakan `getServerSession` untuk mendapatkan sesi pengguna
-  //    dan mengambil tokennya.
+  // 1. Buat file `src/app/api/auth/[...nextauth]/route.ts` (atau .js).
+  // 2. Konfigurasikan GoogleProvider dengan GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET,
+  //    dan minta scopes:
+  //    `https://www.googleapis.com/auth/spreadsheets`
+  //    `https://www.googleapis.com/auth/drive.file`
+  // 3. Dalam callbacks `jwt` dan `session` di `next-auth`, pastikan `accessToken`
+  //    (dan `refreshToken` jika memungkinkan) dari Google disimpan dan dapat diakses.
+  // 4. Di sini, Anda akan menggunakan `getServerSession` (jika di server component/route handler)
+  //    atau cara lain untuk mendapatkan sesi pengguna dan tokennya.
   //
-  // **Contoh Placeholder dengan `next-auth` (sesuaikan dengan implementasi Anda):**
+  // **Contoh Placeholder dengan `next-auth` (sesuaikan):**
   /*
   try {
-    const session = await getServerSession(authOptions); // authOptions dari file [...nextauth]
-    if (session && session.accessToken) { // Pastikan accessToken ada di tipe session Anda
-      oauth2Client.setCredentials({
-        access_token: session.accessToken as string,
-        // refresh_token: session.refreshToken as string | undefined, // Jika Anda juga menyimpan dan mengelola refresh token
-      });
-      console.log("🔧 [getAuthenticatedClient] OAuth2 client configured with tokens from next-auth session.");
-
-      // Opsional: Logika untuk refresh token jika access token akan kedaluwarsa
-      // if (oauth2Client.isTokenExpiring() && session.refreshToken) {
-      //   console.log("⏳ [getAuthenticatedClient] Access token is expiring, attempting to refresh...");
-      //   try {
-      //     const { tokens } = await oauth2Client.refreshAccessToken();
-      //     oauth2Client.setCredentials(tokens);
-      //     console.log("🔑 [getAuthenticatedClient] Access token refreshed successfully using next-auth refresh token.");
-      //     // TODO: Anda mungkin perlu memperbarui token di sesi next-auth jika di-refresh di sini.
-      //   } catch (refreshError: any) {
-      //     console.error("🚨 [getAuthenticatedClient] Error refreshing access token:", refreshError.message);
-      //     // Tangani error refresh token (misalnya, minta pengguna login ulang)
-      //   }
-      // }
-
-    } else {
-      console.warn("⚠️ [getAuthenticatedClient] No valid session or access token found via next-auth. Google API calls will likely fail. User needs to login.");
-    }
+    // Cara mendapatkan sesi mungkin berbeda tergantung di mana kode ini dipanggil.
+    // Untuk Server Actions seperti ini, Anda mungkin perlu meneruskan sesi/token sebagai argumen
+    // atau memiliki cara khusus untuk mengaksesnya dalam konteks Server Action.
+    // const session = await getServerSession(authOptions); // Dapatkan sesi pengguna
+    // if (session && (session as any).accessToken) { // Pastikan accessToken ada di tipe session Anda
+    //   oauth2Client.setCredentials({
+    //     access_token: (session as any).accessToken as string,
+    //     // refresh_token: (session as any).refreshToken as string | undefined, // Jika Anda juga menyimpan dan mengelola refresh token
+    //   });
+    //   console.log("🔧 [getAuthenticatedClient] OAuth2 client configured with tokens from next-auth session.");
+    // } else {
+    //   console.warn("⚠️ [getAuthenticatedClient] No valid session or access token found via next-auth. Google API calls will likely fail. User needs to login.");
+    // }
   } catch (sessionError: any) {
-    console.error("🔴 [getAuthenticatedClient] Error getting session for OAuth tokens:", sessionError.message);
+    console.error("🔴 [getAuthenticatedClient] Error getting/processing session for OAuth tokens:", sessionError.message);
   }
   */
   //---------------------------------------------------------------------------
   // !!! AKHIR BAGIAN IMPLEMENTASI TOKEN !!!
   //---------------------------------------------------------------------------
 
-
   if (!oauth2Client.credentials.access_token && !oauth2Client.credentials.refresh_token) {
-    console.warn("🕵️ [getAuthenticatedClient] Reminder: OAuth2 client does NOT have an access_token or refresh_token. This means authentication with Google has not been completed. Implement token retrieval (e.g., via next-auth) and setting credentials on oauth2Client. Google API calls will fail.");
+    const noTokenMessage = "🔴 CRITICAL [getAuthenticatedClient]: OAuth2 client does NOT have an access_token. This will cause Google API calls to fail with 'No access, refresh token, API key or refresh handler callback is set.' error. You MUST implement full OAuth 2.0 token retrieval (e.g., using next-auth) and then call 'oauth2Client.setCredentials({ access_token: YOUR_TOKEN });' before this client can be used.";
+    console.error(noTokenMessage);
+    console.warn("🕵️ [getAuthenticatedClient] Reminder: Implement token retrieval (e.g., via next-auth) and set credentials on oauth2Client. Google API calls will fail without it.");
+  } else {
+    console.log("✅ [getAuthenticatedClient] OAuth2 client has an access_token set (or refresh_token). Proceeding with API client creation.");
   }
 
   return oauth2Client;
@@ -92,6 +84,7 @@ export async function getSheetsClient() {
 }
 
 export async function getDriveClient() {
-  const auth = await getAuthenticatedClient(); // Sebelumnya ada typo, memanggil dirinya sendiri
+  const auth = await getAuthenticatedClient();
   return google.drive({ version: 'v3', auth });
 }
+
