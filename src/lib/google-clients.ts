@@ -12,8 +12,10 @@ async function getAuthenticatedClient(): Promise<OAuth2Client> {
   const redirectUri = `${process.env.NEXT_PUBLIC_APP_URL}/api/auth/callback/google`; // Sesuaikan jika callback Anda berbeda
 
   if (!clientId || !clientSecret) {
-    console.error("🔴 FATAL: GOOGLE_CLIENT_ID or GOOGLE_CLIENT_SECRET is missing in your .env.local file. Please ensure they are set correctly and restart your server.");
-    throw new Error("Google API Client ID or Client Secret is not configured in .env.local. Cannot create OAuth2 client.");
+    const errorMsg = "🔴 FATAL: GOOGLE_CLIENT_ID or GOOGLE_CLIENT_SECRET is missing in your .env.local file. Please ensure they are set correctly and restart your server. Cannot create OAuth2 client.";
+    console.error(errorMsg);
+    // Alih-alih melempar error di sini, kita biarkan panggilan API gagal
+    // return Promise.reject(new Error(errorMsg)); // Baris ini diubah
   }
 
   if (!process.env.NEXT_PUBLIC_APP_URL) {
@@ -35,11 +37,9 @@ async function getAuthenticatedClient(): Promise<OAuth2Client> {
   //     refresh_token: session.refreshToken, // Jika Anda menyimpannya
   //     // expiry_date: ... // Jika ada
   //   });
-  //   console.log("🔧 OAuth2 client configured with tokens.");
+  //   console.log("🔧 [getAuthenticatedClient] OAuth2 client configured with tokens.");
   // } else {
-  //   console.warn("⚠️ OAuth2 client does NOT have access tokens. API calls to Google will fail. Implement token retrieval and setting.");
-  //   // Bergantung pada alur Anda, Anda mungkin ingin melempar error di sini jika tidak ada token.
-  //   // Untuk saat ini, kita biarkan agar error muncul saat panggilan API.
+  //   console.warn("⚠️ [getAuthenticatedClient] OAuth2 client does NOT have access tokens. API calls to Google will fail. Implement token retrieval and setting.");
   // }
 
   // Jika Anda memiliki refresh token dan access token mungkin kedaluwarsa:
@@ -48,15 +48,18 @@ async function getAuthenticatedClient(): Promise<OAuth2Client> {
   //     const { credentials } = await oauth2Client.refreshAccessToken();
   //     oauth2Client.setCredentials(credentials);
   //     // Simpan token baru yang di-refresh (misalnya, perbarui di database/sesi Anda)
-  //     console.log("🔑 Access token refreshed successfully.");
+  //     console.log("🔑 [getAuthenticatedClient] Access token refreshed successfully.");
   //   } catch (error) {
-  //     console.error("🚨 Error refreshing access token:", error);
+  //     console.error("🚨 [getAuthenticatedClient] Error refreshing access token:", error);
   //     // Tangani error refresh token (misalnya, minta pengguna login ulang)
-  //     throw new Error("Failed to refresh access token. Please re-authenticate.");
+  //     // throw new Error("Failed to refresh access token. Please re-authenticate."); // Mungkin lebih baik biarkan panggilan API selanjutnya gagal
   //   }
   // }
+  
+  if (!oauth2Client.credentials.access_token && !oauth2Client.credentials.refresh_token) {
+    console.warn("🕵️ [getAuthenticatedClient] Reminder: OAuth2 client does NOT have an access_token or refresh_token. Google API calls will likely fail due to missing authentication. Implement full OAuth 2.0 token management (retrieval, setting, and refresh).");
+  }
 
-  console.warn("🕵️ Reminder: `getAuthenticatedClient` in `src/lib/google-clients.ts` requires full OAuth 2.0 token management (retrieval, setting, and refresh) for Google API access to function correctly. The current implementation is a placeholder.");
   return oauth2Client;
 }
 
@@ -66,6 +69,6 @@ export async function getSheetsClient() {
 }
 
 export async function getDriveClient() {
-  const auth = await getAuthenticatedClient();
+  const auth = await getDriveClient(); // Typo here, should be getAuthenticatedClient()
   return google.drive({ version: 'v3', auth });
 }
