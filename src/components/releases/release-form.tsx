@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -12,12 +12,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
-import { CalendarIcon } from 'lucide-react';
+import { CalendarIcon, FileAudio, ImageIcon } from 'lucide-react';
 import { format } from 'date-fns';
 import type { ReleaseEntry, ReleaseStatus } from '@/types';
 import { cn } from '@/lib/utils';
+import Image from 'next/image'; // Using next/image for placeholder
 
-const releaseStatusOptions: ReleaseStatus[] = ["Upload", "Pending Rilis", "Takedown"];
+const releaseStatusOptions: ReleaseStatus[] = ["Upload", "Pending", "Rilis", "Takedown"];
 
 const releaseFormSchema = z.object({
   judulRilisan: z.string().min(1, "Judul rilisan tidak boleh kosong"),
@@ -30,6 +31,8 @@ const releaseFormSchema = z.object({
   status: z.enum(releaseStatusOptions, {
     required_error: "Status harus dipilih.",
   }),
+  coverArtUrl: z.string().optional(),
+  audioFileName: z.string().optional(),
 });
 
 export type ReleaseFormValues = z.infer<typeof releaseFormSchema>;
@@ -41,6 +44,9 @@ interface ReleaseFormProps {
 }
 
 export function ReleaseForm({ onSubmit, initialData, onCancel }: ReleaseFormProps) {
+  const [coverArtPreview, setCoverArtPreview] = useState<string | null>(initialData?.coverArtUrl || null);
+  const [selectedAudioFileName, setSelectedAudioFileName] = useState<string | null>(initialData?.audioFileName || null);
+
   const form = useForm<ReleaseFormValues>({
     resolver: zodResolver(releaseFormSchema),
     defaultValues: {
@@ -50,6 +56,8 @@ export function ReleaseForm({ onSubmit, initialData, onCancel }: ReleaseFormProp
       isrc: initialData?.isrc || '',
       tanggalTayang: initialData?.tanggalTayang ? new Date(initialData.tanggalTayang) : undefined,
       status: initialData?.status || undefined,
+      coverArtUrl: initialData?.coverArtUrl || '',
+      audioFileName: initialData?.audioFileName || '',
     },
   });
 
@@ -62,7 +70,11 @@ export function ReleaseForm({ onSubmit, initialData, onCancel }: ReleaseFormProp
         isrc: initialData.isrc || '',
         tanggalTayang: initialData.tanggalTayang ? new Date(initialData.tanggalTayang) : undefined,
         status: initialData.status || undefined,
+        coverArtUrl: initialData.coverArtUrl || '',
+        audioFileName: initialData.audioFileName || '',
       });
+      setCoverArtPreview(initialData.coverArtUrl || null);
+      setSelectedAudioFileName(initialData.audioFileName || null);
     } else {
       form.reset({ 
         judulRilisan: '',
@@ -71,11 +83,42 @@ export function ReleaseForm({ onSubmit, initialData, onCancel }: ReleaseFormProp
         isrc: '',
         tanggalTayang: undefined,
         status: undefined,
+        coverArtUrl: '',
+        audioFileName: '',
       });
+      setCoverArtPreview(null);
+      setSelectedAudioFileName(null);
     }
   }, [initialData, form]);
   
   const idRilisDisplay = initialData?.idRilis || "Otomatis";
+
+  const handleCoverArtChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const result = reader.result as string;
+        setCoverArtPreview(result);
+        form.setValue('coverArtUrl', result);
+      };
+      reader.readAsDataURL(file);
+    } else {
+      setCoverArtPreview(null);
+      form.setValue('coverArtUrl', '');
+    }
+  };
+
+  const handleAudioFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      setSelectedAudioFileName(file.name);
+      form.setValue('audioFileName', file.name);
+    } else {
+      setSelectedAudioFileName(null);
+      form.setValue('audioFileName', '');
+    }
+  };
 
   return (
     <Form {...form}>
@@ -175,9 +218,6 @@ export function ReleaseForm({ onSubmit, initialData, onCancel }: ReleaseFormProp
                     mode="single"
                     selected={field.value}
                     onSelect={field.onChange}
-                    // disabled={(date) =>
-                    //   date > new Date() || date < new Date("1900-01-01")
-                    // }
                     initialFocus
                   />
                 </PopoverContent>
@@ -209,6 +249,33 @@ export function ReleaseForm({ onSubmit, initialData, onCancel }: ReleaseFormProp
             </FormItem>
           )}
         />
+
+        <FormItem>
+          <FormLabel htmlFor="coverArt">Gambar Sampul (Cover Art)</FormLabel>
+          <Input id="coverArt" type="file" accept="image/*" onChange={handleCoverArtChange} className="h-auto p-2"/>
+          {coverArtPreview && (
+            <div className="mt-2">
+              <Image src={coverArtPreview} alt="Cover art preview" width={100} height={100} className="rounded-md object-cover" data-ai-hint="album cover" />
+            </div>
+          )}
+          {!coverArtPreview && (
+             <div className="mt-2 w-[100px] h-[100px] bg-muted rounded-md flex items-center justify-center">
+                <ImageIcon className="w-8 h-8 text-muted-foreground" />
+             </div>
+          )}
+          <FormMessage>{form.formState.errors.coverArtUrl?.message}</FormMessage>
+        </FormItem>
+
+        <FormItem>
+          <FormLabel htmlFor="audioFile">File Audio</FormLabel>
+          <Input id="audioFile" type="file" accept="audio/*" onChange={handleAudioFileChange} className="h-auto p-2" />
+          {selectedAudioFileName && (
+            <p className="text-sm text-muted-foreground mt-2 flex items-center">
+              <FileAudio className="mr-2 h-4 w-4" /> {selectedAudioFileName}
+            </p>
+          )}
+          <FormMessage>{form.formState.errors.audioFileName?.message}</FormMessage>
+        </FormItem>
         
         <div className="flex justify-end gap-2 pt-4">
           <Button type="button" variant="outline" onClick={onCancel}>

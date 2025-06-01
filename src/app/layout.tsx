@@ -4,8 +4,8 @@ import './globals.css';
 import { Toaster } from "@/components/ui/toaster";
 
 export const metadata: Metadata = {
-  title: 'VortexTunes Digital - Music Distribution Analytics',
-  description: 'Import, view, and analyze your music distribution data with VortexTunes Digital.',
+  title: 'VortexTunes Digital - Manajemen Rilisan',
+  description: 'Kelola rilisan musik digital Anda dengan VortexTunes Digital.',
 };
 
 export default function RootLayout({

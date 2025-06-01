@@ -17,7 +17,7 @@ export interface PlatformSummaryStats {
   trackCount: number;
 }
 
-export type ReleaseStatus = "Upload" | "Pending Rilis" | "Takedown";
+export type ReleaseStatus = "Upload" | "Pending" | "Rilis" | "Takedown";
 
 export interface ReleaseEntry {
   idRilis: string;
@@ -27,4 +27,7 @@ export interface ReleaseEntry {
   isrc?: string;
   tanggalTayang: Date;
   status: ReleaseStatus;
+  coverArtUrl?: string; // Data URL for cover art
+  audioFileName?: string; // Name of the uploaded audio file
 }
+

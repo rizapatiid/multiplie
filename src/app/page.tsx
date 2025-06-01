@@ -1,119 +1,106 @@
 
 "use client";
 
-import React, { useState, useEffect } from 'react';
-import Link from 'next/link';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
-import { CsvImporter } from '@/components/core/csv-importer';
-import { DataTable } from '@/components/core/data-table';
-import { PlatformSummaries } from '@/components/core/platform-summaries';
-import { RevenueInsightsGenerator } from '@/components/core/revenue-insights-generator';
-import { LatestReleases } from '@/components/dashboard/latest-releases';
-import { TopArtists } from '@/components/dashboard/top-artists';
-import type { DistributionDataEntry, ReleaseEntry } from '@/types';
+import { Input } from '@/components/ui/input';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose } from '@/components/ui/dialog';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { PlusCircle, Search, Trash2, Music, FileAudio } from 'lucide-react';
+import type { ReleaseEntry, ReleaseStatus } from '@/types';
+import { ReleaseForm, type ReleaseFormValues } from '@/components/releases/release-form';
 import { useToast } from '@/hooks/use-toast';
-import { FileSpreadsheet, ShieldAlert, MusicNote, User } from 'lucide-react';
+import Link from 'next/link';
+import { format } from 'date-fns';
+import Image from 'next/image';
 
-const DISTRIBUTION_DATA_KEY = 'trackStackData';
-const RELEASES_DATA_KEY = 'trackStackReleases';
+const LOCAL_STORAGE_KEY = 'trackStackReleases'; // Keeping key for potential existing data
 
-export default function HomePage() {
-  const [distributionData, setDistributionData] = useState<DistributionDataEntry[]>([]);
-  const [releaseData, setReleaseData] = useState<ReleaseEntry[]>([]);
-  const [isLoadingCsv, setIsLoadingCsv] = useState(false);
+export default function ReleasesPage() {
+  const [releases, setReleases] = useState<ReleaseEntry[]>([]);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [editingRelease, setEditingRelease] = useState<ReleaseEntry | null>(null);
   const { toast } = useToast();
-  const [showDistributionDataSections, setShowDistributionDataSections] = useState(false);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      // Load distribution data
-      const storedDistributionData = localStorage.getItem(DISTRIBUTION_DATA_KEY);
-      if (storedDistributionData) {
+      const storedReleases = localStorage.getItem(LOCAL_STORAGE_KEY);
+      if (storedReleases) {
         try {
-          const parsedData = JSON.parse(storedDistributionData);
-          if (Array.isArray(parsedData) && parsedData.length > 0) {
-            setDistributionData(parsedData);
-            setShowDistributionDataSections(true);
-            toast({
-              title: "Data Distribusi Dimuat",
-              description: "Data impor sebelumnya telah dimuat dari local storage.",
-            });
-          }
-        } catch (error) {
-          console.error("Gagal memuat data distribusi dari localStorage", error);
-          localStorage.removeItem(DISTRIBUTION_DATA_KEY);
-        }
-      }
-
-      // Load release data
-      const storedReleaseData = localStorage.getItem(RELEASES_DATA_KEY);
-      if (storedReleaseData) {
-        try {
-          const parsedReleases = JSON.parse(storedReleaseData).map((r: any) => ({
+          const parsedReleases = JSON.parse(storedReleases).map((r: any) => ({
             ...r,
-            tanggalTayang: new Date(r.tanggalTayang),
+            tanggalTayang: new Date(r.tanggalTayang), 
           }));
-          if (Array.isArray(parsedReleases) && parsedReleases.length > 0) {
-            setReleaseData(parsedReleases);
-             toast({
-              title: "Data Rilisan Dimuat",
-              description: "Data rilisan sebelumnya telah dimuat dari local storage.",
-            });
-          }
+          setReleases(parsedReleases);
         } catch (error) {
           console.error("Gagal memuat data rilisan dari localStorage", error);
-          localStorage.removeItem(RELEASES_DATA_KEY);
+          localStorage.removeItem(LOCAL_STORAGE_KEY);
         }
       }
     }
-  }, [toast]);
+  }, []);
 
-  const handleCsvImport = (parsedData: DistributionDataEntry[], error?: string) => {
-    setIsLoadingCsv(false);
-    if (error) {
-      toast({
-        variant: "destructive",
-        title: "Kesalahan Impor CSV",
-        description: error,
-      });
-      setDistributionData([]);
-      setShowDistributionDataSections(false);
-      if (typeof window !== 'undefined') {
-        localStorage.removeItem(DISTRIBUTION_DATA_KEY);
-      }
-    } else if (parsedData.length > 0) {
-      setDistributionData(parsedData);
-      setShowDistributionDataSections(true);
-      toast({
-        title: "CSV Berhasil Diimpor",
-        description: `Berhasil mengimpor ${parsedData.length} rekaman.`,
-      });
-      if (typeof window !== 'undefined') {
-        localStorage.setItem(DISTRIBUTION_DATA_KEY, JSON.stringify(parsedData));
-      }
-    } else {
-       toast({
-        title: "Tidak Ada Data Diimpor",
-        description: "File CSV kosong atau tidak berisi baris data yang valid.",
-      });
-      setDistributionData([]);
-      setShowDistributionDataSections(false);
-      if (typeof window !== 'undefined') {
-        localStorage.removeItem(DISTRIBUTION_DATA_KEY);
-      }
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(releases));
     }
+  }, [releases]);
+
+  const handleAddRelease = (data: ReleaseFormValues) => {
+    if (editingRelease) {
+      setReleases(prevReleases => 
+        prevReleases.map(r => r.idRilis === editingRelease.idRilis ? { ...editingRelease, ...data } : r)
+      );
+      toast({ title: "Rilisan Diperbarui", description: `Rilisan "${data.judulRilisan}" telah berhasil diperbarui.` });
+      setEditingRelease(null);
+    } else {
+      const newRelease: ReleaseEntry = {
+        ...data,
+        idRilis: crypto.randomUUID(),
+        // coverArtUrl and audioFileName are already in data from form
+      };
+      setReleases(prevReleases => [newRelease, ...prevReleases]);
+      toast({ title: "Rilisan Ditambahkan", description: `Rilisan "${data.judulRilisan}" telah berhasil ditambahkan.` });
+    }
+    setIsAddDialogOpen(false);
+  };
+
+  const handleDeleteRelease = (idRilis: string) => {
+    setReleases(prevReleases => prevReleases.filter(r => r.idRilis !== idRilis));
+    toast({ title: "Rilisan Dihapus", description: "Rilisan telah berhasil dihapus.", variant: "destructive" });
   };
   
-  const handleClearDistributionData = () => {
-    setDistributionData([]);
-    setShowDistributionDataSections(false);
-    if (typeof window !== 'undefined') {
-      localStorage.removeItem(DISTRIBUTION_DATA_KEY);
+  const handleOpenEditDialog = (release: ReleaseEntry) => {
+    setEditingRelease(release);
+    setIsAddDialogOpen(true);
+  };
+
+  const handleOpenAddDialog = () => {
+    setEditingRelease(null);
+    setIsAddDialogOpen(true);
+  };
+
+  const filteredReleases = useMemo(() => {
+    return releases.filter(release =>
+      release.judulRilisan.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      release.artist.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+  }, [releases, searchTerm]);
+
+  const getStatusColor = (status: ReleaseStatus) => {
+    switch (status) {
+      case 'Upload':
+        return 'bg-blue-100 text-blue-700'; // Blue for Upload
+      case 'Pending':
+        return 'bg-yellow-100 text-yellow-700'; // Yellow for Pending
+      case 'Rilis':
+        return 'bg-green-100 text-green-700'; // Green for Rilis
+      case 'Takedown':
+        return 'bg-red-100 text-red-700'; // Red for Takedown
+      default:
+        return 'bg-gray-100 text-gray-700';
     }
-    toast({
-      title: "Data Distribusi Dihapus",
-      description: "Semua data impor telah dihapus.",
-    });
   };
 
   return (
@@ -125,80 +112,102 @@ export default function HomePage() {
           </Link>
           <nav className="flex items-center gap-4">
             <Link href="/" passHref>
-              <Button variant="outline" size="sm" className="border-primary text-primary">Dashboard</Button>
-            </Link>
-            <Link href="/releases" passHref>
-              <Button variant="ghost" size="sm">Manajemen Rilisan</Button>
+              <Button variant="outline" size="sm" className="border-primary text-primary">Manajemen Rilisan</Button>
             </Link>
           </nav>
         </div>
       </header>
 
       <main className="flex-grow container max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Release Management Data Sections */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-12">
-          <section id="latest-releases-section">
-            <LatestReleases releases={releaseData} />
-          </section>
-          <section id="top-artists-section">
-            <TopArtists releases={releaseData} />
-          </section>
-        </div>
-        
-        {/* CSV Importer and Distribution Data Sections */}
-        <section id="csv-importer-section" className="mb-12 flex flex-col items-center">
-          <CsvImporter onImport={handleCsvImport} isLoading={isLoadingCsv} />
-          {distributionData.length > 0 && (
-            <Button onClick={handleClearDistributionData} variant="outline" size="sm" className="mt-4">
-              Hapus Data Impor CSV
-            </Button>
-          )}
-        </section>
-
-        {isLoadingCsv && (
-          <div className="flex justify-center items-center py-10">
-            <svg className="animate-spin h-8 w-8 text-primary" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-            </svg>
-            <p className="ml-3 text-muted-foreground">Memuat data CSV...</p>
+        <div className="flex flex-col sm:flex-row justify-between items-center mb-8 gap-4">
+          <h2 className="text-2xl font-bold font-headline">Manajemen Rilisan</h2>
+          <div className="flex gap-2 w-full sm:w-auto">
+            <div className="relative flex-grow sm:flex-grow-0">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                type="search"
+                placeholder="Cari rilisan (judul, artis)..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-10 w-full sm:w-64"
+              />
+            </div>
+            <Dialog open={isAddDialogOpen} onOpenChange={(open) => {
+              setIsAddDialogOpen(open);
+              if (!open) setEditingRelease(null);
+            }}>
+              <DialogTrigger asChild>
+                <Button onClick={handleOpenAddDialog}>
+                  <PlusCircle className="mr-2 h-5 w-5" />
+                  Tambah Rilisan
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
+                <DialogHeader>
+                  <DialogTitle>{editingRelease ? "Edit Rilisan" : "Tambah Rilisan Baru"}</DialogTitle>
+                </DialogHeader>
+                <ReleaseForm 
+                  onSubmit={handleAddRelease} 
+                  initialData={editingRelease || undefined} 
+                  onCancel={() => {
+                    setIsAddDialogOpen(false);
+                    setEditingRelease(null);
+                  }}
+                />
+              </DialogContent>
+            </Dialog>
           </div>
-        )}
+        </div>
 
-        {!isLoadingCsv && distributionData.length === 0 && (
-           <div className="text-center py-16 bg-card rounded-lg shadow-md mb-12">
-            <FileSpreadsheet className="mx-auto h-16 w-16 text-primary opacity-50 mb-4" />
-            <h2 className="text-2xl font-headline font-semibold mb-2">Selamat Datang di VortexTunes Digital</h2>
-            <p className="text-muted-foreground max-w-md mx-auto">
-              Impor file CSV distribusi musik Anda untuk memulai. Lihat data Anda, analisis kinerja platform, dan dapatkan wawasan berbasis AI. Jika Anda sudah menambahkan rilisan, data rilisan terbaru dan artis teratas akan muncul di atas.
+        {filteredReleases.length === 0 ? (
+          <div className="text-center py-16 bg-card rounded-lg shadow-md">
+            <Music className="mx-auto h-16 w-16 text-primary opacity-50 mb-4" />
+            <h3 className="text-xl font-semibold mb-2">Tidak Ada Rilisan</h3>
+            <p className="text-muted-foreground">
+              {searchTerm ? "Tidak ada rilisan yang cocok dengan pencarian Anda." : "Belum ada rilisan yang ditambahkan. Klik 'Tambah Rilisan' untuk memulai."}
             </p>
           </div>
-        )}
-
-        {showDistributionDataSections && distributionData.length > 0 && (
-          <>
-            <section id="platform-summaries-section" className="mb-12">
-              <PlatformSummaries data={distributionData} />
-            </section>
-
-            <section id="data-table-section" className="mb-12">
-              <DataTable data={distributionData} />
-            </section>
-
-            <section id="revenue-insights-section" className="mb-12">
-              <RevenueInsightsGenerator data={distributionData} />
-            </section>
-          </>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {filteredReleases.map((release) => (
+              <Card key={release.idRilis} className="flex flex-col justify-between">
+                <CardHeader>
+                  <div className="flex items-start gap-4">
+                    {release.coverArtUrl ? (
+                      <Image src={release.coverArtUrl} alt={release.judulRilisan} width={64} height={64} className="rounded-md object-cover aspect-square" data-ai-hint="album cover" />
+                    ) : (
+                      <Image src="https://placehold.co/64x64.png" alt="Placeholder" width={64} height={64} className="rounded-md object-cover aspect-square" data-ai-hint="album cover" />
+                    )}
+                    <div className="flex-1">
+                      <CardTitle className="truncate text-lg" title={release.judulRilisan}>{release.judulRilisan}</CardTitle>
+                      <CardDescription>{release.artist}</CardDescription>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-1 text-sm pt-2">
+                  <p><span className="font-medium">ID Rilis:</span> {release.idRilis}</p>
+                  {release.upc && <p><span className="font-medium">UPC:</span> {release.upc}</p>}
+                  {release.isrc && <p><span className="font-medium">ISRC:</span> {release.isrc}</p>}
+                  <p><span className="font-medium">Tgl Tayang:</span> {format(new Date(release.tanggalTayang), "dd MMM yyyy")}</p>
+                  <p><span className="font-medium">Status:</span> <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${getStatusColor(release.status)}`}>{release.status}</span></p>
+                  {release.audioFileName && (
+                    <p className="flex items-center text-muted-foreground"><FileAudio className="mr-1.5 h-4 w-4" /><span className="font-medium mr-1">Audio:</span> {release.audioFileName}</p>
+                  )}
+                </CardContent>
+                <CardFooter className="flex justify-end gap-2 pt-4">
+                  <Button variant="outline" size="sm" onClick={() => handleOpenEditDialog(release)}>Edit</Button>
+                  <Button variant="destructive" size="sm" onClick={() => handleDeleteRelease(release.idRilis)}>
+                    <Trash2 className="h-4 w-4"/>
+                  </Button>
+                </CardFooter>
+              </Card>
+            ))}
+          </div>
         )}
       </main>
-
-      <footer className="py-6 border-t">
+       <footer className="py-6 border-t">
         <div className="container max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 text-center text-xs text-muted-foreground">
           <p className="font-headline">&copy; {new Date().getFullYear()} VortexTunes Digital. All rights reserved.</p>
-          <p className="mt-1">
-            <ShieldAlert className="inline h-3 w-3 mr-1" />
-            Wawasan pendapatan dihasilkan oleh AI dan disediakan hanya untuk tujuan informasi. Verifikasi informasi penting dan gunakan dengan risiko Anda sendiri.
-          </p>
         </div>
       </footer>
     </div>
