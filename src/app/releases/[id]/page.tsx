@@ -79,7 +79,7 @@ export default function ReleaseDetailPage() {
       <div className="flex flex-col min-h-screen bg-background">
         <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
           <div className="container flex h-16 items-center justify-between max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-            <Button variant="ghost" size="icon" onClick={() => router.back()}>
+            <Button variant="ghost" size="icon" onClick={() => router.back()} className="hover:bg-muted">
               <ArrowLeft className="h-5 w-5" />
             </Button>
             <h1 className="text-xl font-bold font-headline tracking-tight text-primary">
