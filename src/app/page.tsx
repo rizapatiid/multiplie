@@ -12,6 +12,7 @@ import { ReleaseForm, type ReleaseFormValues } from '@/components/releases/relea
 import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
 import Image from 'next/image';
+import { ThemeToggleButton } from '@/components/theme-toggle-button';
 
 const LOCAL_STORAGE_KEY = 'trackStackReleases';
 
@@ -21,7 +22,7 @@ export default function ReleasesPage() {
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [editingRelease, setEditingRelease] = useState<ReleaseEntry | null>(null);
   const [currentYear, setCurrentYear] = useState<number | null>(null);
-  const [isDataLoaded, setIsDataLoaded] = useState(false); // Flag to track initial data load
+  const [isDataLoaded, setIsDataLoaded] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -36,15 +37,15 @@ export default function ReleasesPage() {
           setReleases(parsedReleases);
         } catch (error) {
           console.error("Gagal memuat data rilisan dari localStorage", error);
-          localStorage.removeItem(LOCAL_STORAGE_KEY); // Clear corrupted data
+          localStorage.removeItem(LOCAL_STORAGE_KEY); 
         }
       }
-      setIsDataLoaded(true); // Mark that initial loading attempt is complete
+      setIsDataLoaded(true); 
     }
   }, []);
 
   useEffect(() => {
-    if (typeof window !== 'undefined' && isDataLoaded) { // Only save if initial data load attempt is complete
+    if (typeof window !== 'undefined' && isDataLoaded) { 
       localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(releases));
     }
   }, [releases, isDataLoaded]);
@@ -110,7 +111,6 @@ export default function ReleasesPage() {
       }
       if (!isNaN(idA)) return -1;
       if (!isNaN(idB)) return 1;
-      // Fallback to date sort if IDs are not numeric or mixed
       return new Date(b.tanggalTayang).getTime() - new Date(a.tanggalTayang).getTime();
     });
   }, [releases, searchTerm]);
@@ -118,20 +118,20 @@ export default function ReleasesPage() {
   const getStatusColor = (status: ReleaseStatus) => {
     switch (status) {
       case 'Upload':
-        return 'bg-blue-100 text-blue-700';
+        return 'bg-blue-500 text-white';
       case 'Pending':
-        return 'bg-yellow-100 text-yellow-700';
+        return 'bg-yellow-500 text-white';
       case 'Rilis':
-        return 'bg-green-100 text-green-700';
+        return 'bg-green-500 text-white';
       case 'Takedown':
-        return 'bg-red-100 text-red-700';
+        return 'bg-red-500 text-white';
       default:
-        return 'bg-gray-100 text-gray-700';
+        return 'bg-gray-500 text-white';
     }
   };
 
   return (
-    <div className="flex flex-col min-h-screen bg-background">
+    <div className="flex flex-col min-h-screen">
       <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="container flex h-16 items-center justify-between max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
           <Link href="/" className="text-xl sm:text-2xl font-bold font-headline tracking-tight text-primary">
@@ -148,6 +148,7 @@ export default function ReleasesPage() {
                 className="pl-10 w-40 sm:w-64 h-9 text-sm"
               />
             </div>
+            <ThemeToggleButton />
           </div>
         </div>
       </header>
@@ -155,7 +156,7 @@ export default function ReleasesPage() {
       <main className="flex-grow container max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         
         {isDataLoaded && filteredReleases.length === 0 ? (
-          <div className="text-center py-16">
+           <div className="text-center py-16">
             <Music className="mx-auto h-16 w-16 text-primary opacity-50 mb-4" />
             <h3 className="text-xl font-semibold mb-2 text-foreground">Tidak Ada Rilisan</h3>
             <p className="text-muted-foreground">
@@ -169,7 +170,7 @@ export default function ReleasesPage() {
         ) : (
           <div className="flex flex-col gap-4">
             {filteredReleases.map((release) => (
-              <Card key={release.idRilis} className="w-full overflow-hidden shadow-sm hover:shadow-md transition-shadow duration-200">
+              <Card key={release.idRilis} className="w-full overflow-hidden shadow-sm hover:shadow-md transition-shadow duration-200 dark:border-slate-700">
                 <div className="flex flex-row items-stretch">
                   <Link 
                     href={`/releases/${release.idRilis}`} 
@@ -185,7 +186,7 @@ export default function ReleasesPage() {
                       </div>
                       <div className="flex-1 space-y-0.5 min-w-0">
                         <p className="text-xs text-muted-foreground truncate" title={release.idRilis}>ID: {release.idRilis}</p>
-                        <h3 className="text-base font-semibold leading-tight truncate" title={release.judulRilisan}>
+                        <h3 className="text-base font-semibold leading-tight truncate text-foreground" title={release.judulRilisan}>
                           {release.judulRilisan}
                         </h3>
                         <p className="text-sm text-muted-foreground truncate" title={release.artist}>
@@ -199,7 +200,7 @@ export default function ReleasesPage() {
                       </div>
                     </div>
                   </Link>
-                  <div className="flex flex-col items-center justify-center gap-2 p-3 border-l bg-muted/25 rounded-r-lg">
+                  <div className="flex flex-col items-center justify-center gap-2 p-3 border-l bg-muted/25 dark:bg-slate-800/50 dark:border-slate-700 rounded-r-lg">
                     <Button 
                       variant="outline" 
                       size="sm" 

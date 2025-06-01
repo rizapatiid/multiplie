@@ -6,12 +6,13 @@ import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
 import { format } from 'date-fns';
-import { ArrowLeft, Music, FileAudio, CalendarDays, Tag, UserCircle, Key, ListChecks } from 'lucide-react';
+import { ArrowLeft, Music, FileAudio, CalendarDays, Tag, Key, ListChecks } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import type { ReleaseEntry, ReleaseStatus } from '@/types';
+import { ThemeToggleButton } from '@/components/theme-toggle-button';
 
 const LOCAL_STORAGE_KEY = 'trackStackReleases';
 
@@ -50,7 +51,7 @@ export default function ReleaseDetailPage() {
       case 'Pending':
         return 'secondary';
       case 'Rilis':
-        return 'default'; // Or a success variant if you add one
+        return 'default'; 
       case 'Takedown':
         return 'destructive';
       default:
@@ -63,7 +64,7 @@ export default function ReleaseDetailPage() {
       case 'Upload':
         return 'bg-blue-500 hover:bg-blue-600';
       case 'Pending':
-        return 'bg-yellow-500 hover:bg-yellow-600';
+        return 'bg-yellow-500 hover:bg-yellow-600 text-black'; // Ensure text is readable on yellow
       case 'Rilis':
         return 'bg-green-500 hover:bg-green-600';
       case 'Takedown':
@@ -76,7 +77,7 @@ export default function ReleaseDetailPage() {
 
   if (loading) {
     return (
-      <div className="flex flex-col min-h-screen bg-background">
+      <div className="flex flex-col min-h-screen">
         <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
           <div className="container flex h-16 items-center justify-between max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
             <Button variant="ghost" size="icon" onClick={() => router.back()} className="hover:bg-muted">
@@ -85,11 +86,11 @@ export default function ReleaseDetailPage() {
             <h1 className="text-xl font-bold font-headline tracking-tight text-primary">
               Detail Rilisan
             </h1>
-            <div className="w-8"></div>
+            <div className="w-10"><ThemeToggleButton /></div>
           </div>
         </header>
         <main className="flex-grow container max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <div className="text-center py-10">Memuat detail rilisan...</div>
+          <div className="text-center py-10 text-muted-foreground">Memuat detail rilisan...</div>
         </main>
       </div>
     );
@@ -97,7 +98,7 @@ export default function ReleaseDetailPage() {
 
   if (!release) {
     return (
-      <div className="flex flex-col min-h-screen bg-background">
+      <div className="flex flex-col min-h-screen">
         <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
           <div className="container flex h-16 items-center justify-between max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
              <Button variant="ghost" size="icon" onClick={() => router.back()} className="hover:bg-muted">
@@ -106,11 +107,11 @@ export default function ReleaseDetailPage() {
             <h1 className="text-xl font-bold font-headline tracking-tight text-primary">
               Detail Rilisan
             </h1>
-            <div className="w-8"></div>
+            <div className="w-10"><ThemeToggleButton /></div>
           </div>
         </header>
         <main className="flex-grow container max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <Card className="shadow-lg">
+          <Card className="shadow-lg dark:border-slate-700">
             <CardHeader>
               <CardTitle className="text-center text-destructive">Rilisan Tidak Ditemukan</CardTitle>
             </CardHeader>
@@ -131,7 +132,7 @@ export default function ReleaseDetailPage() {
   }
 
   return (
-    <div className="flex flex-col min-h-screen bg-background">
+    <div className="flex flex-col min-h-screen">
        <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="container flex h-16 items-center justify-between max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
            <Button variant="ghost" size="icon" onClick={() => router.back()} className="hover:bg-muted">
@@ -140,12 +141,12 @@ export default function ReleaseDetailPage() {
           <h1 className="text-xl sm:text-2xl font-bold font-headline tracking-tight text-primary truncate px-2 text-center" title={release.judulRilisan}>
             {release.judulRilisan}
           </h1>
-          <div className="w-8"></div> {/* Placeholder for balance */}
+           <div className="w-10"><ThemeToggleButton /></div>
         </div>
       </header>
 
       <main className="flex-grow container max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <Card className="shadow-xl overflow-hidden">
+        <Card className="shadow-xl overflow-hidden dark:border-slate-700">
           <div className="relative w-full aspect-[2/1] sm:aspect-[3/1] md:aspect-[4/1] bg-muted">
             {release.coverArtUrl ? (
               <Image 
@@ -175,7 +176,7 @@ export default function ReleaseDetailPage() {
                 <Key className="h-5 w-5 text-primary flex-shrink-0" />
                 <div>
                   <p className="text-xs text-muted-foreground">ID Rilis</p>
-                  <p className="font-medium">{release.idRilis}</p>
+                  <p className="font-medium text-foreground">{release.idRilis}</p>
                 </div>
               </div>
 
@@ -183,7 +184,7 @@ export default function ReleaseDetailPage() {
                 <ListChecks className="h-5 w-5 text-primary flex-shrink-0" />
                 <div>
                   <p className="text-xs text-muted-foreground">Status</p>
-                   <Badge variant={getStatusVariant(release.status)} className={`text-sm ${getStatusColorClass(release.status)} text-white`}>
+                   <Badge variant={getStatusVariant(release.status)} className={`text-sm ${getStatusColorClass(release.status)} ${release.status === 'Pending' ? 'text-black' : 'text-white'}`}>
                     {release.status}
                   </Badge>
                 </div>
@@ -194,7 +195,7 @@ export default function ReleaseDetailPage() {
                   <Tag className="h-5 w-5 text-primary flex-shrink-0" />
                   <div>
                     <p className="text-xs text-muted-foreground">UPC</p>
-                    <p className="font-medium break-all">{release.upc}</p>
+                    <p className="font-medium break-all text-foreground">{release.upc}</p>
                   </div>
                 </div>
               )}
@@ -204,7 +205,7 @@ export default function ReleaseDetailPage() {
                   <Tag className="h-5 w-5 text-primary flex-shrink-0" />
                   <div>
                     <p className="text-xs text-muted-foreground">ISRC</p>
-                    <p className="font-medium break-all">{release.isrc}</p>
+                    <p className="font-medium break-all text-foreground">{release.isrc}</p>
                   </div>
                 </div>
               )}
@@ -213,7 +214,7 @@ export default function ReleaseDetailPage() {
                 <CalendarDays className="h-5 w-5 text-primary flex-shrink-0" />
                 <div>
                   <p className="text-xs text-muted-foreground">Tanggal Tayang</p>
-                  <p className="font-medium">{format(new Date(release.tanggalTayang), "dd MMMM yyyy")}</p>
+                  <p className="font-medium text-foreground">{format(new Date(release.tanggalTayang), "dd MMMM yyyy")}</p>
                 </div>
               </div>
 
@@ -222,7 +223,7 @@ export default function ReleaseDetailPage() {
                   <FileAudio className="h-5 w-5 text-primary flex-shrink-0" />
                   <div>
                     <p className="text-xs text-muted-foreground">File Audio</p>
-                    <p className="font-medium truncate" title={release.audioFileName}>{release.audioFileName}</p>
+                    <p className="font-medium truncate text-foreground" title={release.audioFileName}>{release.audioFileName}</p>
                   </div>
                 </div>
               )}
@@ -248,4 +249,3 @@ export default function ReleaseDetailPage() {
     </div>
   );
 }
-
