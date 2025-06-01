@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Card } from '@/components/ui/card';
-import { PlusCircle, Search, Trash2, Music, Edit, ListFilter } from 'lucide-react';
+import { PlusCircle, Search, Trash2, Music, Edit } from 'lucide-react';
 import type { ReleaseEntry, ReleaseStatus } from '@/types';
 import { ReleaseForm, type ReleaseFormValues } from '@/components/releases/release-form';
 import { useToast } from '@/hooks/use-toast';
@@ -150,12 +150,10 @@ export default function ReleasesPage() {
       </header>
 
       <main className="flex-grow container max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="flex flex-col sm:flex-row justify-between items-center mb-8 gap-4">
-          <h2 className="text-2xl font-bold font-headline">Manajemen Rilisan</h2>
-        </div>
-
+        {/* Judul "Manajemen Rilisan" dihapus dari sini */}
+        
         {filteredReleases.length === 0 ? (
-          <div className="text-center py-16"> {/* Removed Card styling */}
+          <div className="text-center py-16">
             <Music className="mx-auto h-16 w-16 text-primary opacity-50 mb-4" />
             <h3 className="text-xl font-semibold mb-2 text-foreground">Tidak Ada Rilisan</h3>
             <p className="text-muted-foreground">
@@ -259,3 +257,5 @@ export default function ReleasesPage() {
     </div>
   );
 }
+
+    
