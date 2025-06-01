@@ -5,9 +5,8 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Card } from '@/components/ui/card'; // CardDescription, CardFooter, CardHeader, CardTitle, CardContent removed as direct children
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
-import { PlusCircle, Search, Trash2, Music, FileAudio } from 'lucide-react';
+import { Card } from '@/components/ui/card';
+import { PlusCircle, Search, Trash2, Music, FileAudio, Edit } from 'lucide-react';
 import type { ReleaseEntry, ReleaseStatus } from '@/types';
 import { ReleaseForm, type ReleaseFormValues } from '@/components/releases/release-form';
 import { useToast } from '@/hooks/use-toast';
@@ -70,7 +69,7 @@ export default function ReleasesPage() {
           .filter(id => !isNaN(id));
 
         if (numericIds.length === 0) {
-          newIdRilis = '1'; // Fallback if all existing IDs are non-numeric for some reason
+          newIdRilis = '1';
         } else {
           newIdRilis = (Math.max(0, ...numericIds) + 1).toString();
         }
@@ -109,15 +108,12 @@ export default function ReleasesPage() {
     ).sort((a, b) => {
       const idA = parseInt(a.idRilis, 10);
       const idB = parseInt(b.idRilis, 10);
-      // Sort by numeric ID descending if both are numbers
       if (!isNaN(idA) && !isNaN(idB)) {
         return idB - idA;
       }
-      // If one is not a number, or both are not numbers, fall back to date or original order for stability
-      // This ensures new numeric IDs are generally at the top
-      if (!isNaN(idA)) return -1; // Keep numeric IDs before non-numeric
-      if (!isNaN(idB)) return 1;  // Keep numeric IDs before non-numeric
-      return new Date(b.tanggalTayang).getTime() - new Date(a.tanggalTayang).getTime(); // Fallback for non-numeric IDs
+      if (!isNaN(idA)) return -1;
+      if (!isNaN(idB)) return 1;
+      return new Date(b.tanggalTayang).getTime() - new Date(a.tanggalTayang).getTime();
     });
   }, [releases, searchTerm]);
 
@@ -172,57 +168,43 @@ export default function ReleasesPage() {
             </p>
           </div>
         ) : (
-          <div className="flex flex-col gap-4"> {/* Changed gap from 6 to 4 */}
+          <div className="flex flex-col gap-4">
             {filteredReleases.map((release) => (
-              <Card key={release.idRilis} className="w-full overflow-hidden">
-                <Accordion type="single" collapsible className="w-full">
-                  <AccordionItem value={release.idRilis} className="border-b-0">
-                    <AccordionTrigger className="p-4 text-left hover:no-underline data-[state=open]:bg-muted/50 focus-visible:ring-1 focus-visible:ring-ring w-full">
-                      <div className="flex items-start gap-4 w-full">
-                        <div className="w-16 h-16 sm:w-20 sm:h-20 flex-shrink-0 relative">
-                          {release.coverArtUrl ? (
-                            <Image src={release.coverArtUrl} alt={release.judulRilisan} fill className="rounded-md object-cover" data-ai-hint="album cover" />
-                          ) : (
-                            <Image src="https://placehold.co/80x80.png" alt="Placeholder" fill className="rounded-md object-cover" data-ai-hint="album cover" />
-                          )}
-                        </div>
-                        <div className="flex-1 space-y-1 min-w-0">
-                          <p className="text-xs text-muted-foreground truncate" title={release.idRilis}>ID: {release.idRilis}</p>
-                          <h3 className="text-base sm:text-lg font-semibold leading-tight truncate" title={release.judulRilisan}>
-                            {release.judulRilisan}
-                          </h3>
-                          <p className="text-sm text-muted-foreground truncate" title={release.artist}>
-                            {release.artist}
-                          </p>
-                          <p className="text-sm mt-1">
-                            <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${getStatusColor(release.status)}`}>
-                              {release.status}
-                            </span>
-                          </p>
-                        </div>
-                      </div>
-                    </AccordionTrigger>
-                    <AccordionContent className="border-t">
-                      <div className="px-4 py-3 space-y-2 text-sm">
-                        {release.upc && <p><span className="font-medium text-foreground">UPC:</span> {release.upc}</p>}
-                        {release.isrc && <p><span className="font-medium text-foreground">ISRC:</span> {release.isrc}</p>}
-                        <p><span className="font-medium text-foreground">Tgl Tayang:</span> {format(new Date(release.tanggalTayang), "dd MMM yyyy")}</p>
-                        {release.audioFileName && (
-                          <p className="flex items-center text-muted-foreground text-xs truncate">
-                            <FileAudio className="mr-1.5 h-3 w-3 flex-shrink-0 text-foreground" />
-                            <span className="font-medium text-foreground mr-1">Audio:</span>
-                            <span className="truncate" title={release.audioFileName}>{release.audioFileName}</span>
-                          </p>
+              <Card key={release.idRilis} className="w-full overflow-hidden shadow-sm hover:shadow-md transition-shadow duration-200">
+                <div className="flex flex-col sm:flex-row">
+                  <Link href={`/releases/${release.idRilis}`} className="flex-grow p-4 block hover:bg-muted/30 focus-visible:ring-1 focus-visible:ring-ring rounded-t-lg sm:rounded-l-lg sm:rounded-tr-none">
+                    <div className="flex flex-col sm:flex-row items-start gap-4 w-full">
+                      <div className="w-full sm:w-20 h-auto sm:h-20 flex-shrink-0 relative aspect-square">
+                        {release.coverArtUrl ? (
+                          <Image src={release.coverArtUrl} alt={release.judulRilisan} fill className="rounded-md object-cover" data-ai-hint="album cover" />
+                        ) : (
+                          <Image src="https://placehold.co/80x80.png" alt="Placeholder" fill className="rounded-md object-cover" data-ai-hint="album cover" />
                         )}
                       </div>
-                    </AccordionContent>
-                  </AccordionItem>
-                </Accordion>
-                <div className="p-3 sm:p-4 border-t flex items-center justify-end gap-2 bg-muted/20">
-                  <Button variant="outline" size="sm" onClick={() => handleOpenEditDialog(release)} className="h-8 px-3 text-xs sm:text-sm">Edit</Button>
-                  <Button variant="destructive" size="sm" onClick={() => handleDeleteRelease(release.idRilis)} className="h-8 px-3">
-                    <Trash2 className="h-3 w-3 sm:h-4 sm:w-4" />
-                  </Button>
+                      <div className="flex-1 space-y-1 min-w-0 mt-2 sm:mt-0">
+                        <p className="text-xs text-muted-foreground truncate" title={release.idRilis}>ID: {release.idRilis}</p>
+                        <h3 className="text-base sm:text-lg font-semibold leading-tight truncate" title={release.judulRilisan}>
+                          {release.judulRilisan}
+                        </h3>
+                        <p className="text-sm text-muted-foreground truncate" title={release.artist}>
+                          {release.artist}
+                        </p>
+                        <p className="text-sm mt-1">
+                          <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${getStatusColor(release.status)}`}>
+                            {release.status}
+                          </span>
+                        </p>
+                      </div>
+                    </div>
+                  </Link>
+                  <div className="p-3 sm:p-4 border-t sm:border-t-0 sm:border-l flex flex-row sm:flex-col items-center justify-end sm:justify-center gap-2 bg-muted/20 rounded-b-lg sm:rounded-r-lg sm:rounded-bl-none">
+                    <Button variant="outline" size="sm" onClick={() => handleOpenEditDialog(release)} className="h-8 px-3 text-xs sm:text-sm">
+                      <Edit className="h-3 w-3 sm:mr-1" /> <span className="hidden sm:inline">Edit</span>
+                    </Button>
+                    <Button variant="destructive" size="sm" onClick={() => handleDeleteRelease(release.idRilis)} className="h-8 px-3">
+                      <Trash2 className="h-3 w-3 sm:h-4 sm:w-4" />
+                    </Button>
+                  </div>
                 </div>
               </Card>
             ))}
@@ -269,6 +251,4 @@ export default function ReleasesPage() {
     </div>
   );
 }
-    
-
     
