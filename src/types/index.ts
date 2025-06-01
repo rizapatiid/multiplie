@@ -20,14 +20,30 @@ export interface PlatformSummaryStats {
 export type ReleaseStatus = "Upload" | "Pending" | "Rilis" | "Takedown";
 
 export interface ReleaseEntry {
-  idRilis: string;
+  idRilis: string; // Sebaiknya ini ID unik dari spreadsheet atau yang digenerate server
   judulRilisan: string;
   artist: string;
   upc?: string;
   isrc?: string;
   tanggalTayang: Date;
   status: ReleaseStatus;
-  coverArtUrl?: string; // Data URL for cover art
-  audioFileName?: string; // Name of the uploaded audio file
+  coverArtUrl?: string; // Ini akan menjadi URL ke Google Drive atau ID file Drive
+  audioFileName?: string; // Bisa nama file asli, atau ID file Drive
+  // idInternalSpreadsheet?: string; // Jika Anda memiliki ID unik di Spreadsheet
 }
 
+// Digunakan oleh form, sebelum file diupload dan mendapatkan URL/ID
+export interface ReleaseFormValues {
+  idRilis?: string; // Opsional saat membuat, ada saat mengedit
+  judulRilisan: string;
+  artist: string;
+  upc?: string;
+  isrc?: string;
+  tanggalTayang: Date;
+  status: ReleaseStatus;
+  coverArtUrl?: string; // URL yang ada (untuk edit) atau string kosong
+  audioFileName?: string; // Nama file yang ada (untuk edit)
+  // File object untuk upload baru/penggantian
+  coverArtFile?: File | null;
+  audioFile?: File | null;
+}

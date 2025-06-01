@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -11,16 +11,19 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
-import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
-import { CalendarIcon, FileAudio, ImageIcon } from 'lucide-react';
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import { CalendarIcon, FileAudio, ImageIcon, Loader2 } from 'lucide-react';
 import { format } from 'date-fns';
-import type { ReleaseEntry, ReleaseStatus } from '@/types';
+import type { ReleaseEntry, ReleaseStatus, ReleaseFormValues as ReleaseFormSchemaTypes } from '@/types';
 import { cn } from '@/lib/utils';
-import Image from 'next/image'; // Using next/image for placeholder
+import Image from 'next/image';
 
 const releaseStatusOptions: ReleaseStatus[] = ["Upload", "Pending", "Rilis", "Takedown"];
 
-const releaseFormSchema = z.object({
+// Skema Zod untuk validasi form di sisi klien
+// Tidak lagi menyertakan coverArtFile dan audioFile karena akan ditangani sebagai File object
+const clientReleaseFormSchema = z.object({
+  idRilis: z.string().optional(),
   judulRilisan: z.string().min(1, "Judul rilisan tidak boleh kosong"),
   artist: z.string().min(1, "Nama artis tidak boleh kosong"),
   upc: z.string().optional(),
@@ -31,31 +34,37 @@ const releaseFormSchema = z.object({
   status: z.enum(releaseStatusOptions, {
     required_error: "Status harus dipilih.",
   }),
-  coverArtUrl: z.string().optional(),
-  audioFileName: z.string().optional(),
+  coverArtUrl: z.string().optional(), // Menyimpan URL yang sudah ada atau preview
+  audioFileName: z.string().optional(), // Menyimpan nama file yang sudah ada
 });
 
-export type ReleaseFormValues = z.infer<typeof releaseFormSchema>;
+// Type untuk nilai form yang digunakan oleh react-hook-form
+type ClientFormValues = z.infer<typeof clientReleaseFormSchema>;
 
 interface ReleaseFormProps {
-  onSubmit: (data: ReleaseFormValues) => void;
+  onSubmitAction: (formData: FormData) => Promise<any>; // Menerima FormData
   initialData?: Partial<ReleaseEntry>;
   onCancel: () => void;
+  isSubmitting?: boolean;
 }
 
-export function ReleaseForm({ onSubmit, initialData, onCancel }: ReleaseFormProps) {
+export function ReleaseForm({ onSubmitAction, initialData, onCancel, isSubmitting }: ReleaseFormProps) {
   const [coverArtPreview, setCoverArtPreview] = useState<string | null>(initialData?.coverArtUrl || null);
   const [selectedAudioFileName, setSelectedAudioFileName] = useState<string | null>(initialData?.audioFileName || null);
+  
+  const coverArtFileRef = useRef<HTMLInputElement>(null);
+  const audioFileRef = useRef<HTMLInputElement>(null);
 
-  const form = useForm<ReleaseFormValues>({
-    resolver: zodResolver(releaseFormSchema),
+  const form = useForm<ClientFormValues>({
+    resolver: zodResolver(clientReleaseFormSchema),
     defaultValues: {
+      idRilis: initialData?.idRilis || '',
       judulRilisan: initialData?.judulRilisan || '',
       artist: initialData?.artist || '',
       upc: initialData?.upc || '',
       isrc: initialData?.isrc || '',
-      tanggalTayang: initialData?.tanggalTayang ? new Date(initialData.tanggalTayang) : undefined,
-      status: initialData?.status || undefined,
+      tanggalTayang: initialData?.tanggalTayang ? new Date(initialData.tanggalTayang) : new Date(),
+      status: initialData?.status || "Pending",
       coverArtUrl: initialData?.coverArtUrl || '',
       audioFileName: initialData?.audioFileName || '',
     },
@@ -64,25 +73,27 @@ export function ReleaseForm({ onSubmit, initialData, onCancel }: ReleaseFormProp
   useEffect(() => {
     if (initialData) {
       form.reset({
+        idRilis: initialData.idRilis || '',
         judulRilisan: initialData.judulRilisan || '',
         artist: initialData.artist || '',
         upc: initialData.upc || '',
         isrc: initialData.isrc || '',
-        tanggalTayang: initialData.tanggalTayang ? new Date(initialData.tanggalTayang) : undefined,
-        status: initialData.status || undefined,
+        tanggalTayang: initialData.tanggalTayang ? new Date(initialData.tanggalTayang) : new Date(),
+        status: initialData.status || "Pending",
         coverArtUrl: initialData.coverArtUrl || '',
         audioFileName: initialData.audioFileName || '',
       });
       setCoverArtPreview(initialData.coverArtUrl || null);
       setSelectedAudioFileName(initialData.audioFileName || null);
     } else {
-      form.reset({ 
+      form.reset({
+        idRilis: '',
         judulRilisan: '',
         artist: '',
         upc: '',
         isrc: '',
-        tanggalTayang: undefined,
-        status: undefined,
+        tanggalTayang: new Date(),
+        status: "Pending",
         coverArtUrl: '',
         audioFileName: '',
       });
@@ -91,21 +102,20 @@ export function ReleaseForm({ onSubmit, initialData, onCancel }: ReleaseFormProp
     }
   }, [initialData, form]);
   
-  const idRilisDisplay = initialData?.idRilis || "Otomatis";
+  const idRilisDisplay = initialData?.idRilis || "Otomatis (dari Server)";
 
   const handleCoverArtChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
       const reader = new FileReader();
       reader.onloadend = () => {
-        const result = reader.result as string;
-        setCoverArtPreview(result);
-        form.setValue('coverArtUrl', result);
+        setCoverArtPreview(reader.result as string);
+        form.setValue('coverArtUrl', reader.result as string); // Untuk preview
       };
       reader.readAsDataURL(file);
     } else {
-      setCoverArtPreview(null);
-      form.setValue('coverArtUrl', '');
+      setCoverArtPreview(initialData?.coverArtUrl || null); // Kembali ke URL awal jika batal pilih
+      form.setValue('coverArtUrl', initialData?.coverArtUrl || '');
     }
   };
 
@@ -113,20 +123,59 @@ export function ReleaseForm({ onSubmit, initialData, onCancel }: ReleaseFormProp
     const file = event.target.files?.[0];
     if (file) {
       setSelectedAudioFileName(file.name);
-      form.setValue('audioFileName', file.name);
+      form.setValue('audioFileName', file.name); // Untuk tampilan nama file
     } else {
-      setSelectedAudioFileName(null);
-      form.setValue('audioFileName', '');
+      setSelectedAudioFileName(initialData?.audioFileName || null);
+      form.setValue('audioFileName', initialData?.audioFileName || '');
     }
+  };
+
+  const handleSubmit = async (values: ClientFormValues) => {
+    const formData = new FormData();
+    
+    // Append all form fields
+    Object.entries(values).forEach(([key, value]) => {
+      if (key === 'tanggalTayang' && value instanceof Date) {
+        formData.append(key, value.toISOString());
+      } else if (value !== undefined && value !== null) {
+        formData.append(key, String(value));
+      }
+    });
+
+    // Append files if selected
+    if (coverArtFileRef.current?.files?.[0]) {
+      formData.append('coverArtFile', coverArtFileRef.current.files[0]);
+    } else if (!values.coverArtUrl && initialData?.coverArtUrl) {
+      // Jika URL cover art dihapus (preview jadi null) dan ada URL awal,
+      // ini bisa diartikan sebagai permintaan menghapus gambar.
+      // Server action perlu menangani ini (misalnya, dengan mengirim flag khusus)
+      // Untuk saat ini, jika tidak ada file baru, server action akan menggunakan yang lama jika ada.
+    }
+     if (initialData?.coverArtUrl) {
+      formData.append('existingCoverArtUrl', initialData.coverArtUrl);
+    }
+
+
+    if (audioFileRef.current?.files?.[0]) {
+      formData.append('audioFile', audioFileRef.current.files[0]);
+    }
+     if (initialData?.audioFileName) {
+      formData.append('existingAudioFileName', initialData.audioFileName);
+    }
+
+
+    await onSubmitAction(formData);
   };
 
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-        {initialData && (
+      <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
+        {initialData?.idRilis && (
           <div className="space-y-2">
-            <Label htmlFor="idRilis">ID Rilis</Label>
-            <Input id="idRilis" value={idRilisDisplay} disabled className="bg-muted/50" />
+            <Label htmlFor="idRilisDisplay">ID Rilis</Label>
+            <Input id="idRilisDisplay" value={idRilisDisplay} disabled className="bg-muted/50" />
+            {/* Hidden input untuk mengirim idRilis yang sebenarnya */}
+            <input type="hidden" {...form.register("idRilis")} />
           </div>
         )}
 
@@ -137,7 +186,7 @@ export function ReleaseForm({ onSubmit, initialData, onCancel }: ReleaseFormProp
             <FormItem>
               <FormLabel>Judul Rilisan</FormLabel>
               <FormControl>
-                <Input placeholder="Masukkan judul rilisan" {...field} />
+                <Input placeholder="Masukkan judul rilisan" {...field} disabled={isSubmitting} />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -151,7 +200,7 @@ export function ReleaseForm({ onSubmit, initialData, onCancel }: ReleaseFormProp
             <FormItem>
               <FormLabel>Artis</FormLabel>
               <FormControl>
-                <Input placeholder="Masukkan nama artis" {...field} />
+                <Input placeholder="Masukkan nama artis" {...field} disabled={isSubmitting} />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -166,7 +215,7 @@ export function ReleaseForm({ onSubmit, initialData, onCancel }: ReleaseFormProp
               <FormItem>
                 <FormLabel>UPC</FormLabel>
                 <FormControl>
-                  <Input placeholder="Masukkan UPC (opsional)" {...field} />
+                  <Input placeholder="Masukkan UPC (opsional)" {...field} value={field.value || ''} disabled={isSubmitting} />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -180,7 +229,7 @@ export function ReleaseForm({ onSubmit, initialData, onCancel }: ReleaseFormProp
               <FormItem>
                 <FormLabel>ISRC</FormLabel>
                 <FormControl>
-                  <Input placeholder="Masukkan ISRC (opsional)" {...field} />
+                  <Input placeholder="Masukkan ISRC (opsional)" {...field} value={field.value || ''} disabled={isSubmitting} />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -203,6 +252,7 @@ export function ReleaseForm({ onSubmit, initialData, onCancel }: ReleaseFormProp
                         "w-full pl-3 text-left font-normal",
                         !field.value && "text-muted-foreground"
                       )}
+                      disabled={isSubmitting}
                     >
                       {field.value ? (
                         format(field.value, "PPP")
@@ -218,6 +268,7 @@ export function ReleaseForm({ onSubmit, initialData, onCancel }: ReleaseFormProp
                     mode="single"
                     selected={field.value}
                     onSelect={field.onChange}
+                    disabled={isSubmitting || ((date) => date < new Date("1900-01-01"))}
                     initialFocus
                   />
                 </PopoverContent>
@@ -233,7 +284,7 @@ export function ReleaseForm({ onSubmit, initialData, onCancel }: ReleaseFormProp
           render={({ field }) => (
             <FormItem>
               <FormLabel>Status</FormLabel>
-              <Select onValueChange={field.onChange} defaultValue={field.value}>
+              <Select onValueChange={field.onChange} defaultValue={field.value} disabled={isSubmitting}>
                 <FormControl>
                   <SelectTrigger>
                     <SelectValue placeholder="Pilih status rilisan" />
@@ -251,41 +302,51 @@ export function ReleaseForm({ onSubmit, initialData, onCancel }: ReleaseFormProp
         />
 
         <FormItem>
-          <FormLabel htmlFor="coverArt">Gambar Sampul (Cover Art)</FormLabel>
-          <Input id="coverArt" type="file" accept="image/*" onChange={handleCoverArtChange} className="h-auto p-2"/>
-          {coverArtPreview && (
+          <FormLabel htmlFor="coverArtFile">Gambar Sampul (Cover Art)</FormLabel>
+          <Input id="coverArtFile" type="file" accept="image/*" onChange={handleCoverArtChange} className="h-auto p-2" ref={coverArtFileRef} disabled={isSubmitting}/>
+          {coverArtPreview ? (
             <div className="mt-2">
-              <Image src={coverArtPreview} alt="Cover art preview" width={100} height={100} className="rounded-md object-cover" data-ai-hint="album cover" />
+              <Image 
+                src={coverArtPreview} 
+                alt="Cover art preview" 
+                width={100} 
+                height={100} 
+                className="rounded-md object-cover" 
+                data-ai-hint="album cover" 
+                unoptimized={coverArtPreview.includes('drive.google.com') || coverArtPreview.startsWith('blob:')}
+              />
             </div>
-          )}
-          {!coverArtPreview && (
+          ) : (
              <div className="mt-2 w-[100px] h-[100px] bg-muted rounded-md flex items-center justify-center">
                 <ImageIcon className="w-8 h-8 text-muted-foreground" />
              </div>
           )}
-          <FormMessage>{form.formState.errors.coverArtUrl?.message}</FormMessage>
+          {/* <FormMessage>{form.formState.errors.coverArtFile?.message}</FormMessage> */}
         </FormItem>
 
         <FormItem>
           <FormLabel htmlFor="audioFile">File Audio</FormLabel>
-          <Input id="audioFile" type="file" accept="audio/*" onChange={handleAudioFileChange} className="h-auto p-2" />
+          <Input id="audioFile" type="file" accept="audio/*" onChange={handleAudioFileChange} className="h-auto p-2" ref={audioFileRef} disabled={isSubmitting}/>
           {selectedAudioFileName && (
             <p className="text-sm text-muted-foreground mt-2 flex items-center">
               <FileAudio className="mr-2 h-4 w-4" /> {selectedAudioFileName}
             </p>
           )}
-          <FormMessage>{form.formState.errors.audioFileName?.message}</FormMessage>
+           {/* <FormMessage>{form.formState.errors.audioFile?.message}</FormMessage> */}
         </FormItem>
         
         <div className="flex justify-end gap-2 pt-4">
-          <Button type="button" variant="outline" onClick={onCancel}>
+          <Button type="button" variant="outline" onClick={onCancel} disabled={isSubmitting}>
             Batal
           </Button>
-          <Button type="submit" disabled={form.formState.isSubmitting}>
-            {form.formState.isSubmitting ? "Menyimpan..." : (initialData ? "Simpan Perubahan" : "Tambah Rilisan")}
+          <Button type="submit" disabled={isSubmitting}>
+            {isSubmitting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Menyimpan...</> : (initialData?.idRilis ? "Simpan Perubahan" : "Tambah Rilisan")}
           </Button>
         </div>
       </form>
     </Form>
   );
 }
+
+// Export type for external use if needed
+export type { ClientFormValues as ReleaseFormValues };

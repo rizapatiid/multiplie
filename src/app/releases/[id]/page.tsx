@@ -6,7 +6,7 @@ import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
 import { format } from 'date-fns';
-import { ArrowLeft, Music, FileAudio, CalendarDays, Tag, Key, ListChecks } from 'lucide-react';
+import { ArrowLeft, Music, FileAudio, CalendarDays, Tag, Key, ListChecks, Loader2 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -14,8 +14,7 @@ import { Badge } from '@/components/ui/badge';
 import type { ReleaseEntry, ReleaseStatus } from '@/types';
 import { ThemeToggleButton } from '@/components/theme-toggle-button';
 import VortexTunesLogo from '@/components/icons/VortexTunesLogo';
-
-const LOCAL_STORAGE_KEY = 'trackStackReleases';
+import { getReleaseById } from '@/actions/releaseActions'; // Import server action
 
 export default function ReleaseDetailPage() {
   const router = useRouter();
@@ -27,22 +26,23 @@ export default function ReleaseDetailPage() {
 
   useEffect(() => {
     setCurrentYear(new Date().getFullYear());
-    if (releaseId && typeof window !== 'undefined') {
-      const storedReleases = localStorage.getItem(LOCAL_STORAGE_KEY);
-      if (storedReleases) {
+    if (releaseId) {
+      const fetchReleaseDetails = async () => {
+        setLoading(true);
         try {
-          const parsedReleases: ReleaseEntry[] = JSON.parse(storedReleases).map((r: any) => ({
-            ...r,
-            tanggalTayang: new Date(r.tanggalTayang),
-          }));
-          const foundRelease = parsedReleases.find(r => r.idRilis === releaseId);
-          setRelease(foundRelease || null);
+          const data = await getReleaseById(releaseId);
+          setRelease(data);
         } catch (error) {
-          console.error("Gagal memuat data rilisan dari localStorage", error);
+          console.error("Gagal memuat detail rilisan:", error);
+          // Mungkin tampilkan pesan error ke pengguna
+        } finally {
+          setLoading(false);
         }
-      }
+      };
+      fetchReleaseDetails();
+    } else {
+      setLoading(false); // Tidak ada ID, tidak perlu load
     }
-    setLoading(false);
   }, [releaseId]);
 
   const getStatusVariant = (status?: ReleaseStatus) => {
@@ -75,23 +75,35 @@ export default function ReleaseDetailPage() {
     }
   };
 
+  const renderHeader = (titleText?: string) => (
+    <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+      <div className="container flex h-16 items-center justify-between max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+          <Button variant="ghost" size="icon" onClick={() => router.push('/')} className="hover:bg-muted">
+            <ArrowLeft className="h-5 w-5" />
+          </Button>
+          <div className="flex-1 text-center px-2">
+            {titleText ? (
+              <h1 className="text-lg sm:text-xl font-bold font-headline tracking-tight text-primary truncate" title={titleText}>
+                {titleText}
+              </h1>
+            ) : (
+              <VortexTunesLogo className="h-7 sm:h-8 w-auto inline-block" />
+            )}
+          </div>
+         <div className="w-10"><ThemeToggleButton /></div>
+      </div>
+    </header>
+  );
 
   if (loading) {
     return (
       <div className="flex flex-col min-h-screen">
-        <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-          <div className="container flex h-16 items-center justify-between max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-            <Button variant="ghost" size="icon" onClick={() => router.back()} className="hover:bg-muted">
-              <ArrowLeft className="h-5 w-5" />
-            </Button>
-            <h1 className="text-xl font-bold font-headline tracking-tight text-primary">
-              Detail Rilisan
-            </h1>
-            <div className="w-10"><ThemeToggleButton /></div>
-          </div>
-        </header>
+        {renderHeader("Memuat...")}
         <main className="flex-grow container max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <div className="text-center py-10 text-muted-foreground">Memuat detail rilisan...</div>
+          <div className="text-center py-16">
+            <Loader2 className="mx-auto h-12 w-12 text-primary animate-spin mb-4" />
+            <p className="text-muted-foreground">Memuat detail rilisan...</p>
+          </div>
         </main>
       </div>
     );
@@ -100,17 +112,7 @@ export default function ReleaseDetailPage() {
   if (!release) {
     return (
       <div className="flex flex-col min-h-screen">
-        <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-          <div className="container flex h-16 items-center justify-between max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-             <Button variant="ghost" size="icon" onClick={() => router.back()} className="hover:bg-muted">
-                <ArrowLeft className="h-5 w-5" />
-             </Button>
-            <h1 className="text-xl font-bold font-headline tracking-tight text-primary">
-              Detail Rilisan
-            </h1>
-            <div className="w-10"><ThemeToggleButton /></div>
-          </div>
-        </header>
+        {renderHeader("Rilisan Tidak Ditemukan")}
         <main className="flex-grow container max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <Card className="shadow-lg dark:border-slate-700">
             <CardHeader>
@@ -134,24 +136,7 @@ export default function ReleaseDetailPage() {
 
   return (
     <div className="flex flex-col min-h-screen">
-       <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-        <div className="container flex h-16 items-center justify-between max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-            <Button variant="ghost" size="icon" onClick={() => router.back()} className="hover:bg-muted">
-              <ArrowLeft className="h-5 w-5" />
-            </Button>
-            <div className="flex-1 text-center px-2">
-              {release.judulRilisan ? (
-                <h1 className="text-lg sm:text-xl font-bold font-headline tracking-tight text-primary truncate" title={release.judulRilisan}>
-                  {release.judulRilisan}
-                </h1>
-              ) : (
-                <VortexTunesLogo className="h-7 sm:h-8 w-auto inline-block" />
-              )}
-            </div>
-           <div className="w-10"><ThemeToggleButton /></div>
-        </div>
-      </header>
-
+       {renderHeader(release.judulRilisan)}
       <main className="flex-grow container max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <Card className="shadow-xl overflow-hidden dark:border-slate-700">
           <div className="relative w-full aspect-[2/1] sm:aspect-[3/1] md:aspect-[4/1] bg-muted">
@@ -163,6 +148,7 @@ export default function ReleaseDetailPage() {
                 className="object-cover"
                 priority
                 data-ai-hint="album cover"
+                unoptimized={release.coverArtUrl.includes('drive.google.com')}
               />
             ) : (
               <div className="w-full h-full flex items-center justify-center bg-muted">
@@ -230,7 +216,19 @@ export default function ReleaseDetailPage() {
                   <FileAudio className="h-5 w-5 text-primary flex-shrink-0" />
                   <div>
                     <p className="text-xs text-muted-foreground">File Audio</p>
-                    <p className="font-medium truncate text-foreground" title={release.audioFileName}>{release.audioFileName}</p>
+                    <p className="font-medium truncate text-foreground" title={release.audioFileName}>
+                      {release.audioFileName.startsWith('File ID:') ? 
+                        <a 
+                          href={`https://drive.google.com/uc?id=${release.audioFileName.split('File ID: ')[1]}`} 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          className="underline hover:text-primary"
+                        >
+                          Lihat/Unduh Audio (ID: {release.audioFileName.split('File ID: ')[1]})
+                        </a>
+                      : release.audioFileName
+                      }
+                    </p>
                   </div>
                 </div>
               )}

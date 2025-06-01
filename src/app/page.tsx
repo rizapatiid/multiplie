@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Card } from '@/components/ui/card';
-import { PlusCircle, Search, Trash2, Music, Edit } from 'lucide-react';
+import { PlusCircle, Search, Trash2, Music, Edit, Loader2 } from 'lucide-react';
 import type { ReleaseEntry, ReleaseStatus } from '@/types';
 import { ReleaseForm, type ReleaseFormValues } from '@/components/releases/release-form';
 import { useToast } from '@/hooks/use-toast';
@@ -14,9 +14,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { ThemeToggleButton } from '@/components/theme-toggle-button';
 import VortexTunesLogo from '@/components/icons/VortexTunesLogo';
-
-
-const LOCAL_STORAGE_KEY = 'trackStackReleases';
+import { getReleases, deleteRelease, addRelease, updateRelease } from '@/actions/releaseActions';
 
 export default function ReleasesPage() {
   const [releases, setReleases] = useState<ReleaseEntry[]>([]);
@@ -24,71 +22,72 @@ export default function ReleasesPage() {
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [editingRelease, setEditingRelease] = useState<ReleaseEntry | null>(null);
   const [currentYear, setCurrentYear] = useState<number | null>(null);
-  const [isDataLoaded, setIsDataLoaded] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const { toast } = useToast();
 
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const storedReleases = localStorage.getItem(LOCAL_STORAGE_KEY);
-      if (storedReleases) {
-        try {
-          const parsedReleases = JSON.parse(storedReleases).map((r: any) => ({
-            ...r,
-            tanggalTayang: new Date(r.tanggalTayang),
-          }));
-          setReleases(parsedReleases);
-        } catch (error) {
-          console.error("Gagal memuat data rilisan dari localStorage", error);
-          localStorage.removeItem(LOCAL_STORAGE_KEY); 
-        }
-      }
-      setIsDataLoaded(true); 
-    }
-  }, []);
-
-  useEffect(() => {
-    if (typeof window !== 'undefined' && isDataLoaded) { 
-      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(releases));
-    }
-  }, [releases, isDataLoaded]);
-
-  useEffect(() => {
     setCurrentYear(new Date().getFullYear());
+    fetchReleases();
   }, []);
 
-  const handleAddRelease = (data: ReleaseFormValues) => {
-    if (editingRelease) {
-      setReleases(prevReleases =>
-        prevReleases.map(r => r.idRilis === editingRelease.idRilis ? { ...editingRelease, ...data, tanggalTayang: new Date(data.tanggalTayang) } : r)
-      );
-      toast({ title: "Rilisan Diperbarui", description: `Rilisan "${data.judulRilisan}" telah berhasil diperbarui.` });
-      setEditingRelease(null);
-    } else {
-      let newIdRilis: string;
-      const numericIds = releases
-        .map(r => parseInt(r.idRilis, 10))
-        .filter(id => !isNaN(id));
-
-      if (numericIds.length === 0) {
-        newIdRilis = '1';
-      } else {
-        newIdRilis = (Math.max(0, ...numericIds) + 1).toString();
-      }
-
-      const newRelease: ReleaseEntry = {
-        ...data,
-        idRilis: newIdRilis,
-        tanggalTayang: new Date(data.tanggalTayang),
-      };
-      setReleases(prevReleases => [newRelease, ...prevReleases]);
-      toast({ title: "Rilisan Ditambahkan", description: `Rilisan "${data.judulRilisan}" telah berhasil ditambahkan.` });
+  const fetchReleases = async () => {
+    setIsLoading(true);
+    try {
+      const data = await getReleases();
+      setReleases(data);
+    } catch (error) {
+      console.error("Gagal memuat data rilisan:", error);
+      toast({ title: "Error", description: "Gagal memuat data rilisan.", variant: "destructive" });
+      setReleases([]); // Atur ke array kosong jika ada error
+    } finally {
+      setIsLoading(false);
     }
-    setIsAddDialogOpen(false);
   };
 
-  const handleDeleteRelease = (idRilis: string) => {
-    setReleases(prevReleases => prevReleases.filter(r => r.idRilis !== idRilis));
-    toast({ title: "Rilisan Dihapus", description: "Rilisan telah berhasil dihapus.", variant: "destructive" });
+  const handleFormSubmit = async (formData: FormData) => {
+    setIsLoading(true);
+    try {
+      let result;
+      if (editingRelease && editingRelease.idRilis) {
+        result = await updateRelease(editingRelease.idRilis, formData);
+      } else {
+        result = await addRelease(formData);
+      }
+
+      if ('error' in result) {
+        toast({ title: "Gagal", description: result.error, variant: "destructive" });
+      } else {
+        toast({ 
+          title: editingRelease ? "Rilisan Diperbarui" : "Rilisan Ditambahkan", 
+          description: `Rilisan "${result.judulRilisan}" telah berhasil ${editingRelease ? 'diperbarui' : 'ditambahkan'}.` 
+        });
+        setEditingRelease(null);
+        setIsAddDialogOpen(false);
+        fetchReleases(); // Muat ulang data
+      }
+    } catch (error: any) {
+      toast({ title: "Error", description: error.message || "Terjadi kesalahan.", variant: "destructive" });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleDeleteRelease = async (idRilis: string) => {
+    if (!confirm("Apakah Anda yakin ingin menghapus rilisan ini?")) return;
+    setIsLoading(true);
+    try {
+      const result = await deleteRelease(idRilis);
+      if (result.success) {
+        toast({ title: "Rilisan Dihapus", description: "Rilisan telah berhasil dihapus.", variant: "destructive" });
+        fetchReleases(); // Muat ulang data
+      } else {
+        toast({ title: "Gagal", description: result.error || "Gagal menghapus rilisan.", variant: "destructive" });
+      }
+    } catch (error: any) {
+      toast({ title: "Error", description: error.message || "Terjadi kesalahan saat menghapus.", variant: "destructive" });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleOpenEditDialog = (release: ReleaseEntry) => {
@@ -106,15 +105,10 @@ export default function ReleasesPage() {
       release.judulRilisan.toLowerCase().includes(searchTerm.toLowerCase()) ||
       release.artist.toLowerCase().includes(searchTerm.toLowerCase())
     ).sort((a, b) => {
-      const idA = parseInt(a.idRilis, 10);
-      const idB = parseInt(b.idRilis, 10);
-      if (!isNaN(idA) && !isNaN(idB)) {
-        return idB - idA;
-      }
-      if (!isNaN(idA)) return -1;
-      if (!isNaN(idB)) return 1;
-      // Fallback for non-numeric or mixed IDs, sort by date
-      return new Date(b.tanggalTayang).getTime() - new Date(a.tanggalTayang).getTime();
+      // Urutkan berdasarkan tanggal tayang terbaru, atau ID jika tanggal sama
+      const dateComparison = new Date(b.tanggalTayang).getTime() - new Date(a.tanggalTayang).getTime();
+      if (dateComparison !== 0) return dateComparison;
+      return (b.idRilis || "").localeCompare(a.idRilis || "");
     });
   }, [releases, searchTerm]);
 
@@ -123,7 +117,7 @@ export default function ReleasesPage() {
       case 'Upload':
         return 'bg-blue-500 text-white';
       case 'Pending':
-        return 'bg-yellow-500 text-black'; // Ensure text readable
+        return 'bg-yellow-500 text-black';
       case 'Rilis':
         return 'bg-green-500 text-white';
       case 'Takedown':
@@ -157,8 +151,14 @@ export default function ReleasesPage() {
       </header>
 
       <main className="flex-grow container max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        
-        {isDataLoaded && filteredReleases.length === 0 ? (
+        {isLoading && (
+          <div className="text-center py-16">
+            <Loader2 className="mx-auto h-12 w-12 text-primary animate-spin mb-4" />
+            <p className="text-muted-foreground">Memuat data rilisan...</p>
+          </div>
+        )}
+
+        {!isLoading && filteredReleases.length === 0 && (
            <div className="text-center py-16">
             <Music className="mx-auto h-16 w-16 text-primary opacity-50 mb-4" />
             <h3 className="text-xl font-semibold mb-2 text-foreground">Tidak Ada Rilisan</h3>
@@ -166,11 +166,9 @@ export default function ReleasesPage() {
               {searchTerm ? "Tidak ada rilisan yang cocok dengan pencarian Anda." : "Belum ada rilisan yang ditambahkan. Klik tombol '+' untuk memulai."}
             </p>
           </div>
-        ) : !isDataLoaded ? (
-          <div className="text-center py-16">
-             <p className="text-muted-foreground">Memuat data rilisan...</p>
-          </div>
-        ) : (
+        )}
+        
+        {!isLoading && filteredReleases.length > 0 && (
           <div className="flex flex-col gap-4">
             {filteredReleases.map((release) => (
               <Card key={release.idRilis} className="w-full overflow-hidden shadow-sm hover:shadow-md transition-shadow duration-200 dark:border-slate-700">
@@ -182,7 +180,7 @@ export default function ReleasesPage() {
                     <div className="flex flex-row items-center gap-3 h-full">
                       <div className="w-20 h-20 flex-shrink-0 relative aspect-square">
                         {release.coverArtUrl ? (
-                          <Image src={release.coverArtUrl} alt={release.judulRilisan} fill className="rounded-md object-cover" data-ai-hint="album cover"/>
+                          <Image src={release.coverArtUrl} alt={release.judulRilisan} fill className="rounded-md object-cover" data-ai-hint="album cover" unoptimized={release.coverArtUrl.includes('drive.google.com')} />
                         ) : (
                            <Image src="https://placehold.co/80x80.png" alt="Placeholder" fill className="rounded-md object-cover" data-ai-hint="album cover"/>
                         )}
@@ -209,6 +207,7 @@ export default function ReleasesPage() {
                       size="sm" 
                       onClick={() => handleOpenEditDialog(release)}
                       className="px-3 h-9"
+                      disabled={isLoading}
                     >
                       <Edit className="h-3.5 w-3.5 mr-1.5" /> Edit
                     </Button>
@@ -217,6 +216,7 @@ export default function ReleasesPage() {
                       size="icon" 
                       onClick={() => handleDeleteRelease(release.idRilis)}
                       className="h-9 w-9"
+                      disabled={isLoading}
                     >
                       <Trash2 className="h-4 w-4" />
                     </Button>
@@ -238,6 +238,7 @@ export default function ReleasesPage() {
             variant="default"
             className="fixed bottom-6 right-6 z-50 h-14 w-14 rounded-full shadow-lg flex items-center justify-center p-0"
             aria-label="Tambah Rilisan"
+            disabled={isLoading}
           >
             <PlusCircle className="h-7 w-7" />
           </Button>
@@ -247,12 +248,13 @@ export default function ReleasesPage() {
             <DialogTitle>{editingRelease ? "Edit Rilisan" : "Tambah Rilisan Baru"}</DialogTitle>
           </DialogHeader>
           <ReleaseForm
-            onSubmit={handleAddRelease}
+            onSubmitAction={handleFormSubmit}
             initialData={editingRelease || undefined}
             onCancel={() => {
               setIsAddDialogOpen(false);
               setEditingRelease(null);
             }}
+            isSubmitting={isLoading}
           />
         </DialogContent>
       </Dialog>
