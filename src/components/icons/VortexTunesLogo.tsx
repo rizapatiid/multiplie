@@ -8,7 +8,7 @@ interface VortexTunesLogoProps extends React.SVGProps<SVGSVGElement> {
 const VortexTunesLogo: React.FC<VortexTunesLogoProps> = (props) => (
   <svg
     xmlns="http://www.w3.org/2000/svg"
-    viewBox="0 0 230 32" // Adjusted viewBox for a compact logo
+    viewBox="0 0 230 32" 
     aria-label="VortexTunes Logo"
     {...props}
   >
@@ -26,9 +26,9 @@ const VortexTunesLogo: React.FC<VortexTunesLogoProps> = (props) => (
 
     {/* Text: VORTEXTUNES */}
     <text
-      x="40" // Position after VT symbol (approx 33 width + 7 space)
-      y="23" // Vertically align text's baseline
-      fontFamily="Arial, Helvetica, sans-serif" // Standard sans-serif choice
+      x="40" 
+      y="23" 
+      fontFamily="Arial, Helvetica, sans-serif" 
       fontSize="20"
       fontWeight="bold"
       letterSpacing="0.2"
