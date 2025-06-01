@@ -1,6 +1,8 @@
+
 "use client";
 
 import React, { useState, useEffect } from 'react';
+import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { CsvImporter } from '@/components/core/csv-importer';
 import { DataTable } from '@/components/core/data-table';
@@ -8,7 +10,7 @@ import { PlatformSummaries } from '@/components/core/platform-summaries';
 import { RevenueInsightsGenerator } from '@/components/core/revenue-insights-generator';
 import type { DistributionDataEntry } from '@/types';
 import { useToast } from '@/hooks/use-toast';
-import { BarChart3, FileSpreadsheet, Lightbulb, ShieldAlert } from 'lucide-react';
+import { FileSpreadsheet, ShieldAlert } from 'lucide-react';
 
 export default function HomePage() {
   const [data, setData] = useState<DistributionDataEntry[]>([]);
@@ -92,10 +94,17 @@ export default function HomePage() {
     <div className="flex flex-col min-h-screen bg-background">
       <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="container flex h-16 items-center justify-between max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-          <h1 className="text-3xl font-bold font-headline tracking-tight text-primary">
+          <Link href="/" className="text-3xl font-bold font-headline tracking-tight text-primary">
             TrackStack
-          </h1>
-          <p className="text-sm text-muted-foreground hidden sm:block">Your Music Distribution Hub</p>
+          </Link>
+          <nav className="flex items-center gap-4">
+            <Link href="/" passHref>
+              <Button variant="outline" size="sm" className="border-primary text-primary">Dashboard</Button>
+            </Link>
+            <Link href="/releases" passHref>
+              <Button variant="ghost" size="sm">Manajemen Rilisan</Button>
+            </Link>
+          </nav>
         </div>
       </header>
 

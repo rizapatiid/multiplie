@@ -1,3 +1,4 @@
+
 export interface DistributionDataEntry {
   id: string;
   trackName: string;
@@ -14,4 +15,16 @@ export interface PlatformSummaryStats {
   totalRevenue: number;
   totalStreams: number;
   trackCount: number;
+}
+
+export type ReleaseStatus = "Pending" | "Published" | "Archived";
+
+export interface ReleaseEntry {
+  idRilis: string;
+  judulRilisan: string;
+  artist: string;
+  upc?: string;
+  isrc?: string;
+  tanggalTayang: Date;
+  status: ReleaseStatus;
 }
