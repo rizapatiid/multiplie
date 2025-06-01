@@ -21,6 +21,7 @@ export default function ReleasesPage() {
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [editingRelease, setEditingRelease] = useState<ReleaseEntry | null>(null);
   const [currentYear, setCurrentYear] = useState<number | null>(null);
+  const [isDataLoaded, setIsDataLoaded] = useState(false); // Flag to track initial data load
   const { toast } = useToast();
 
   useEffect(() => {
@@ -35,17 +36,18 @@ export default function ReleasesPage() {
           setReleases(parsedReleases);
         } catch (error) {
           console.error("Gagal memuat data rilisan dari localStorage", error);
-          localStorage.removeItem(LOCAL_STORAGE_KEY);
+          localStorage.removeItem(LOCAL_STORAGE_KEY); // Clear corrupted data
         }
       }
+      setIsDataLoaded(true); // Mark that initial loading attempt is complete
     }
   }, []);
 
   useEffect(() => {
-    if (typeof window !== 'undefined') {
+    if (typeof window !== 'undefined' && isDataLoaded) { // Only save if initial data load attempt is complete
       localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(releases));
     }
-  }, [releases]);
+  }, [releases, isDataLoaded]);
 
   useEffect(() => {
     setCurrentYear(new Date().getFullYear());
@@ -108,6 +110,7 @@ export default function ReleasesPage() {
       }
       if (!isNaN(idA)) return -1;
       if (!isNaN(idB)) return 1;
+      // Fallback to date sort if IDs are not numeric or mixed
       return new Date(b.tanggalTayang).getTime() - new Date(a.tanggalTayang).getTime();
     });
   }, [releases, searchTerm]);
@@ -150,15 +153,18 @@ export default function ReleasesPage() {
       </header>
 
       <main className="flex-grow container max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Judul "Manajemen Rilisan" dihapus dari sini */}
         
-        {filteredReleases.length === 0 ? (
+        {isDataLoaded && filteredReleases.length === 0 ? (
           <div className="text-center py-16">
             <Music className="mx-auto h-16 w-16 text-primary opacity-50 mb-4" />
             <h3 className="text-xl font-semibold mb-2 text-foreground">Tidak Ada Rilisan</h3>
             <p className="text-muted-foreground">
               {searchTerm ? "Tidak ada rilisan yang cocok dengan pencarian Anda." : "Belum ada rilisan yang ditambahkan. Klik tombol '+' untuk memulai."}
             </p>
+          </div>
+        ) : !isDataLoaded ? (
+          <div className="text-center py-16">
+             <p className="text-muted-foreground">Memuat data rilisan...</p>
           </div>
         ) : (
           <div className="flex flex-col gap-4">
@@ -174,7 +180,7 @@ export default function ReleasesPage() {
                         {release.coverArtUrl ? (
                           <Image src={release.coverArtUrl} alt={release.judulRilisan} fill className="rounded-md object-cover" data-ai-hint="album cover"/>
                         ) : (
-                          <Image src="https://placehold.co/80x80.png" alt="Placeholder" fill className="rounded-md object-cover" data-ai-hint="album cover"/>
+                           <Image src="https://placehold.co/80x80.png" alt="Placeholder" fill className="rounded-md object-cover" data-ai-hint="album cover"/>
                         )}
                       </div>
                       <div className="flex-1 space-y-0.5 min-w-0">
@@ -257,5 +263,3 @@ export default function ReleasesPage() {
     </div>
   );
 }
-
-    
