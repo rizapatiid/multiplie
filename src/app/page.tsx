@@ -2,21 +2,24 @@
 "use client";
 
 import React, { useState, useEffect, useMemo } from 'react';
+import { useSession } from "next-auth/react"; // Import useSession
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Card } from '@/components/ui/card';
-import { PlusCircle, Search, Trash2, Music, Edit, Loader2, AlertTriangle } from 'lucide-react';
+import { PlusCircle, Search, Trash2, Music, Edit, Loader2, AlertTriangle, UserCircle } from 'lucide-react';
 import type { ReleaseEntry, ReleaseStatus } from '@/types';
-import { ReleaseForm, type ReleaseFormValues } from '@/components/releases/release-form';
+import { ReleaseForm } from '@/components/releases/release-form';
 import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
 import Image from 'next/image';
 import { ThemeToggleButton } from '@/components/theme-toggle-button';
 import VortexTunesLogo from '@/components/icons/VortexTunesLogo';
+import { LoginButton, LogoutButton } from '@/components/auth-components'; // Import Login/Logout buttons
 import { getReleases, deleteRelease, addRelease, updateRelease } from '@/actions/releaseActions';
 
 export default function ReleasesPage() {
+  const { data: session, status: sessionStatus } = useSession(); // Dapatkan sesi
   const [releases, setReleases] = useState<ReleaseEntry[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
@@ -28,8 +31,15 @@ export default function ReleasesPage() {
 
   useEffect(() => {
     setCurrentYear(new Date().getFullYear());
-    fetchReleases();
-  }, []);
+    if (sessionStatus === "authenticated") { // Hanya fetch jika sudah terotentikasi
+      fetchReleases();
+    } else if (sessionStatus === "unauthenticated") {
+      setIsLoading(false);
+      setLoadingError("Silakan login untuk melihat dan mengelola rilisan.");
+      setReleases([]);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sessionStatus]); // Jalankan efek ini ketika status sesi berubah
 
   const fetchReleases = async () => {
     setIsLoading(true);
@@ -44,16 +54,18 @@ export default function ReleasesPage() {
       const errorMessage = error.message || "Gagal memuat data rilisan dari server. Periksa koneksi dan konfigurasi.";
       setLoadingError(errorMessage);
       toast({ title: "Error Memuat Data", description: errorMessage, variant: "destructive" });
-      setReleases([]); 
+      setReleases([]);
     } finally {
       setIsLoading(false);
     }
   };
 
   const handleFormSubmit = async (formData: FormData) => {
+    if (sessionStatus !== "authenticated") {
+      toast({ title: "Belum Login", description: "Anda harus login untuk melakukan aksi ini.", variant: "destructive" });
+      return;
+    }
     setIsLoading(true);
-    // Optimistic: clear previous form submission errors
-    // setLoadingError(null); // Or handle form-specific errors differently
     try {
       let result;
       if (editingRelease && editingRelease.idRilis) {
@@ -81,6 +93,10 @@ export default function ReleasesPage() {
   };
 
   const handleDeleteRelease = async (idRilis: string) => {
+    if (sessionStatus !== "authenticated") {
+      toast({ title: "Belum Login", description: "Anda harus login untuk melakukan aksi ini.", variant: "destructive" });
+      return;
+    }
     if (!confirm("Apakah Anda yakin ingin menghapus rilisan ini?")) return;
     setIsLoading(true);
     try {
@@ -135,6 +151,8 @@ export default function ReleasesPage() {
         return 'bg-gray-500 text-white';
     }
   };
+  
+  const authLoading = sessionStatus === "loading";
 
   return (
     <div className="flex flex-col min-h-screen">
@@ -143,7 +161,13 @@ export default function ReleasesPage() {
           <Link href="/" className="flex items-center">
             <VortexTunesLogo className="h-7 sm:h-8 w-auto" fallbackText="VortexTunes Digital" />
           </Link>
-          <div className="flex items-center gap-2 sm:gap-4">
+          <div className="flex items-center gap-2 sm:gap-3">
+            {sessionStatus === "authenticated" && session?.user?.image && (
+                <Image src={session.user.image} alt={session.user.name || "User"} width={32} height={32} className="rounded-full" />
+            )}
+            {sessionStatus === "authenticated" && !session?.user?.image && (
+                <UserCircle className="h-8 w-8 text-muted-foreground" />
+            )}
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
@@ -151,16 +175,25 @@ export default function ReleasesPage() {
                 placeholder="Cari rilisan..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10 w-40 sm:w-64 h-9 text-sm"
+                className="pl-10 w-32 sm:w-48 h-9 text-sm"
+                disabled={sessionStatus !== "authenticated"}
               />
             </div>
+            {authLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : (session ? <LogoutButton /> : <LoginButton />)}
             <ThemeToggleButton />
           </div>
         </div>
       </header>
 
       <main className="flex-grow container max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {isLoading && (
+        {authLoading && (
+          <div className="text-center py-16">
+            <Loader2 className="mx-auto h-12 w-12 text-primary animate-spin mb-4" />
+            <p className="text-muted-foreground">Memeriksa status login...</p>
+          </div>
+        )}
+
+        {!authLoading && isLoading && sessionStatus === "authenticated" && (
           <div className="text-center py-16">
             <Loader2 className="mx-auto h-12 w-12 text-primary animate-spin mb-4" />
             <p className="text-muted-foreground">Memuat data rilisan...</p>
@@ -168,24 +201,29 @@ export default function ReleasesPage() {
           </div>
         )}
 
-        {!isLoading && loadingError && (
+        {!authLoading && !isLoading && loadingError && (
           <div className="text-center py-16 bg-destructive/10 p-6 rounded-lg">
             <AlertTriangle className="mx-auto h-16 w-16 text-destructive mb-4" />
-            <h3 className="text-xl font-semibold mb-2 text-destructive">Gagal Memuat Rilisan</h3>
-            <p className="text-destructive/80 mb-1">Terjadi kesalahan saat mencoba mengambil data dari Google Sheets.</p>
-            <p className="text-xs text-muted-foreground bg-background/50 p-2 rounded inline-block">Detail: {loadingError}</p>
-            <p className="text-sm text-muted-foreground mt-4">
-              Mohon periksa koneksi internet Anda, konfigurasi variabel lingkungan (terutama `GOOGLE_SPREADSHEET_ID`),
-              dan pastikan aplikasi memiliki izin yang benar untuk mengakses spreadsheet.
-              Cek juga log di konsol server untuk detail teknis.
+            <h3 className="text-xl font-semibold mb-2 text-destructive">
+              {sessionStatus === "unauthenticated" ? "Akses Ditolak" : "Gagal Memuat Rilisan"}
+            </h3>
+            <p className="text-destructive/80 mb-1">
+              {sessionStatus === "unauthenticated" 
+                ? "Anda harus login dengan akun Google Anda untuk mengakses fitur ini." 
+                : "Terjadi kesalahan saat mencoba mengambil data dari Google Sheets."}
             </p>
-            <Button onClick={fetchReleases} variant="outline" className="mt-6">
-              Coba Lagi
-            </Button>
+            {sessionStatus !== "unauthenticated" && <p className="text-xs text-muted-foreground bg-background/50 p-2 rounded inline-block">Detail: {loadingError}</p>}
+            <p className="text-sm text-muted-foreground mt-4">
+              {sessionStatus === "unauthenticated" 
+                ? "Silakan klik tombol login di pojok kanan atas."
+                : "Mohon periksa koneksi internet Anda, konfigurasi variabel lingkungan (terutama `GOOGLE_SPREADSHEET_ID`), dan pastikan aplikasi memiliki izin yang benar untuk mengakses spreadsheet. Cek juga log di konsol server untuk detail teknis."}
+            </p>
+            {sessionStatus === "authenticated" && <Button onClick={fetchReleases} variant="outline" className="mt-6">Coba Lagi</Button>}
+            {sessionStatus === "unauthenticated" && <LoginButton />}
           </div>
         )}
         
-        {!isLoading && !loadingError && filteredReleases.length === 0 && (
+        {!authLoading && !isLoading && !loadingError && sessionStatus === "authenticated" && filteredReleases.length === 0 && (
            <div className="text-center py-16">
             <Music className="mx-auto h-16 w-16 text-primary opacity-50 mb-4" />
             <h3 className="text-xl font-semibold mb-2 text-foreground">Tidak Ada Rilisan</h3>
@@ -197,7 +235,7 @@ export default function ReleasesPage() {
           </div>
         )}
         
-        {!isLoading && !loadingError && filteredReleases.length > 0 && (
+        {!authLoading && !isLoading && !loadingError && sessionStatus === "authenticated" && filteredReleases.length > 0 && (
           <div className="flex flex-col gap-4">
             {filteredReleases.map((release) => (
               <Card key={release.idRilis} className="w-full overflow-hidden shadow-sm hover:shadow-md transition-shadow duration-200 dark:border-slate-700">
@@ -236,7 +274,7 @@ export default function ReleasesPage() {
                       size="sm" 
                       onClick={() => handleOpenEditDialog(release)}
                       className="px-3 h-9"
-                      disabled={isLoading} // Bisa juga dikontrol oleh status loading form individual
+                      disabled={isLoading || sessionStatus !== "authenticated"}
                     >
                       <Edit className="h-3.5 w-3.5 mr-1.5" /> Edit
                     </Button>
@@ -245,7 +283,7 @@ export default function ReleasesPage() {
                       size="icon" 
                       onClick={() => handleDeleteRelease(release.idRilis)}
                       className="h-9 w-9"
-                      disabled={isLoading} // Bisa juga dikontrol oleh status loading form individual
+                      disabled={isLoading || sessionStatus !== "authenticated"}
                     >
                       <Trash2 className="h-4 w-4" />
                     </Button>
@@ -258,6 +296,11 @@ export default function ReleasesPage() {
       </main>
 
       <Dialog open={isAddDialogOpen} onOpenChange={(open) => {
+        if (sessionStatus !== "authenticated" && open) {
+          toast({ title: "Belum Login", description: "Anda harus login untuk menambah/mengedit rilisan.", variant: "destructive" });
+          setIsAddDialogOpen(false);
+          return;
+        }
         setIsAddDialogOpen(open);
         if (!open) setEditingRelease(null);
       }}>
@@ -267,7 +310,7 @@ export default function ReleasesPage() {
             variant="default"
             className="fixed bottom-6 right-6 z-50 h-14 w-14 rounded-full shadow-lg flex items-center justify-center p-0"
             aria-label="Tambah Rilisan"
-            disabled={isLoading && !releases.length} // Disable if initial load is happening
+            disabled={isLoading && (!releases.length && sessionStatus === "authenticated") || sessionStatus !== "authenticated"}
           >
             <PlusCircle className="h-7 w-7" />
           </Button>
@@ -283,7 +326,7 @@ export default function ReleasesPage() {
               setIsAddDialogOpen(false);
               setEditingRelease(null);
             }}
-            isSubmitting={isLoading} // Ini bisa diganti dengan state loading spesifik untuk form
+            isSubmitting={isLoading}
           />
         </DialogContent>
       </Dialog>
@@ -298,4 +341,3 @@ export default function ReleasesPage() {
     </div>
   );
 }
-
